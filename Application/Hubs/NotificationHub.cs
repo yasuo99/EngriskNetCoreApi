@@ -11,6 +11,7 @@ using Application.Helper;
 using Application.Services.Core.Abstraction;
 using AutoMapper;
 using Domain.Models.Version2;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
@@ -30,9 +31,11 @@ namespace Application.Hubs
             _mapper = mapper;
             _sectionService = sectionService;
         }
+        [Authorize]
         public override async Task OnConnectedAsync()
         {
             var clientId = Context.ConnectionId;
+            System.Console.WriteLine(Context?.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value);
             if (Context.UserIdentifier != null)
             {
                 var accountId = Int32.Parse(Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value);
@@ -78,21 +81,27 @@ namespace Application.Hubs
             if (await _context.SaveChangesAsync() > 0)
             {
                 var responseMessage = _mapper.Map<MessageResponseDTO>(message);
-                var boxchatHost = HubHelper.NotificationClientsConnections.FirstOrDefault(rc => rc.AccountId == boxchat.AccountId);
+                var boxchatHost = HubHelper.NotificationClientsConnections.Where(rc => rc.AccountId == boxchat.AccountId).ToList();
                 //Gửi tin nhắn cho member của box chat
                 foreach (var mem in boxchat.Members.Where(mem => mem.Status == Domain.Enums.Status.Approved))
                 {
-                    var receiver = HubHelper.NotificationClientsConnections.FirstOrDefault(rc => rc.AccountId == mem.AccountId);
-                    if (receiver != null)
+                    var receiver = HubHelper.NotificationClientsConnections.Where(rc => rc.AccountId == mem.AccountId).ToList();
+                    if (receiver.Count > 0)
                     {
-                        await Clients.Client(receiver.ClientId).SendAsync("NewMessage", responseMessage.CamelcaseSerialize());
+                        foreach (var client in receiver)
+                        {
+                            await Clients.Client(client.ClientId).SendAsync("NewMessage", responseMessage.CamelcaseSerialize());
 
+                        }
                     }
                 }
                 //Gửi tin nhắn cho chủ host của box
-                if (boxchatHost != null)
+                if (boxchatHost.Count > 0)
                 {
-                    await Clients.Client(boxchatHost.ClientId).SendAsync("NewMessage", responseMessage.CamelcaseSerialize());
+                    foreach (var host in boxchatHost)
+                    {
+                        await Clients.Client(host.ClientId).SendAsync("NewMessage", responseMessage.CamelcaseSerialize());
+                    }
                 }
 
             };
@@ -112,17 +121,23 @@ namespace Application.Hubs
         }
         public async Task ScriptDone(ScriptDoneDTO script)
         {
-            var nextScript = await _sectionService.ScriptDoneAsync(script.ScriptId, script.AccountId);
-            if (nextScript != null)
+            if (!script.Status)
             {
-                await Clients.Client(Context.ConnectionId).SendAsync("cc","clm");
-                System.Console.WriteLine(nextScript.CamelcaseSerialize());
-                await Clients.Client(Context.ConnectionId).SendAsync("NextScript", nextScript.CamelcaseSerialize());
+                var nextScript = await _sectionService.ScriptDoneAsync(script.ScriptId, script.AccountId);
+                if (nextScript != null)
+                {
+                    System.Console.WriteLine(nextScript.CamelcaseSerialize());
+                    await Clients.Client(Context.ConnectionId).SendAsync("NextScript", nextScript.CamelcaseSerialize());
+                }
+                else
+                {
+                    var progress = await _sectionService.SectionFinishUpAsync(script.SectionId, script.AccountId, "finish");
+                    await Clients.Client(Context.ConnectionId).SendAsync("SectionProgress", progress.CamelcaseSerialize());
+                }
             }
             else
             {
-                var progress = await _sectionService.SectionFinishUpAsync(script.SectionId, script.AccountId, "finish");
-                await Clients.Client(Context.ConnectionId).SendAsync("SectionProgress", progress.CamelcaseSerialize());
+                await Clients.Client(Context.ConnectionId).SendAsync("ExamScriptFail");
             }
         }
         public override async Task OnDisconnectedAsync(Exception exception)

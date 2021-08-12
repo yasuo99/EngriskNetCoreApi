@@ -4,8 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Engrisk.Controllers.V2
 {
-    [ApiController]
     [Route("api/v2/[Controller]")]
+    [ApiController]
     public abstract class BaseApiController : ControllerBase
     {
         private IMediator _mediator;

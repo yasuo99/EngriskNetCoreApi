@@ -13,6 +13,7 @@ namespace Application.DTOs.Word
         public string Spelling { get; set; }
         public string WordVoice { get; set; }
         public string Vie { get; set; }
+        public string Class { get; set; }
         public virtual IEnumerable<ExampleDTO> Examples{get;set;}
     }
 }

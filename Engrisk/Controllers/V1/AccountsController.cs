@@ -132,7 +132,7 @@ namespace Engrisk.Controllers.V1
                     {
                         await _userManager.AddToRoleAsync(account, role);
                     }
-                    return CreatedAtAction("GetAccountDetail", new { id = account.Id }, account);
+                    return Ok();
                 }
                 return BadRequest();
             }

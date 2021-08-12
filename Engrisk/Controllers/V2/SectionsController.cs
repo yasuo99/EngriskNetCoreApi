@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Application.DTOs.Pagination;
 using Application.DTOs.Section;
 using Application.Services.Core.Abstraction;
+using Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -31,7 +32,8 @@ namespace Engrisk.Controllers.V2
         }
         [Authorize]
         [HttpGet("manage")]
-        public async Task<IActionResult> GetManageSections([FromQuery] PaginationDTO pagination, [FromQuery] string search){
+        public async Task<IActionResult> GetManageSections([FromQuery] PaginationDTO pagination, [FromQuery] string search)
+        {
             return Ok(await _sectionService.GetManageSectionsAsync(pagination, search));
         }
         [Authorize]
@@ -41,7 +43,8 @@ namespace Engrisk.Controllers.V2
             return Ok(await _sectionService.GetFreeSectionsAsync());
         }
         [HttpGet("{id}/preview")]
-        public async Task<IActionResult> PreviewSection(Guid id){
+        public async Task<IActionResult> PreviewSection(Guid id)
+        {
             return Ok(await _sectionService.SectionPreviewAsync(id));
         }
         [HttpGet("{id}/learn/{quizId}/questions/{questionId}/check/{answerId}")]
@@ -50,31 +53,13 @@ namespace Engrisk.Controllers.V2
             return Ok(await _sectionService.CheckQuestionAnswerAsync(quizId, questionId, answerId));
         }
         [HttpGet("{id}/scripts/edit")]
-        public async Task<IActionResult> GetSectionScript(Guid id){
-            if(!await _sectionService.CheckExistAsync(id)){
-                return NotFound();
-            }
-            return Ok(await _sectionService.GetSectionScriptAsync(id));
-        }
-        [HttpPut("{id}/learn/{quizId}/done")]
-        public async Task<IActionResult> FinishLearnByQuiz(Guid id, Guid quizId)
+        public async Task<IActionResult> GetSectionScript(Guid id)
         {
             if (!await _sectionService.CheckExistAsync(id))
             {
                 return NotFound();
             }
-
-            return Ok();
-        }
-        [HttpPut("{id}/scripts")]
-        public async Task<IActionResult> CreateSectionScript(Guid id, [FromBody] List<ScriptCreateDTO> scripts){
-            if(!await _sectionService.CheckExistAsync(id)){
-                return NotFound();
-            }
-            if(await _sectionService.CreateSectionScriptAsync(id,scripts)){
-                return Ok();
-            }
-            return NoContent();
+            return Ok(await _sectionService.GetSectionScriptAsync(id));
         }
         [Authorize]
         [AllowAnonymous]
@@ -116,12 +101,57 @@ namespace Engrisk.Controllers.V2
             var progress = await _sectionService.SectionFinishUpAsync(id, accountId, "review");
             return Ok(progress);
         }
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteSection(Guid id){
-            if(!await _sectionService.CheckExistAsync(id)){
+        [HttpPut("{id}/learn/{quizId}/done")]
+        public async Task<IActionResult> FinishLearnByQuiz(Guid id, Guid quizId)
+        {
+            if (!await _sectionService.CheckExistAsync(id))
+            {
                 return NotFound();
             }
-            if(await _sectionService.DeleteSectionAsync(id)){
+
+            return Ok();
+        }
+        [Authorize]
+        [HttpPut("{id}/scripts")]
+        public async Task<IActionResult> CreateSectionScript(Guid id, [FromBody] List<ScriptCreateDTO> scripts)
+        {
+            if (!await _sectionService.CheckExistAsync(id))
+            {
+                return NotFound();
+            }
+            if (await _sectionService.CreateSectionScriptAsync(id, scripts))
+            {
+                return Ok();
+            }
+            return NoContent();
+        }
+        [Authorize]
+        [HttpPut("{id}/publish/change")]
+        public async Task<IActionResult> PublishChange(Guid id, [FromQuery] PublishStatus status){
+            try
+            {
+                if(!await _sectionService.CheckExistAsync(id)){
+                    return NotFound();
+                }
+                await _sectionService.PublishAsync(id,status);
+                return Ok();
+            }
+            catch (System.Exception ex)
+            {
+                 // TODO
+                 return BadRequest(ex);
+            }
+        }
+        [Authorize]
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteSection(Guid id)
+        {
+            if (!await _sectionService.CheckExistAsync(id))
+            {
+                return NotFound();
+            }
+            if (await _sectionService.DeleteSectionAsync(id))
+            {
                 return Ok();
             }
             return NoContent();

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Application.DTOs.Account.Route;
+using Application.DTOs.Certificate;
 using Application.DTOs.Pagination;
 using Application.Services;
 using Application.Services.Core.Abstraction;
@@ -24,14 +25,25 @@ namespace Engrisk.Controllers.V2
             _sectionService = sectionService;
         }
         [HttpGet]
-        public async Task<IActionResult> AdminGetAll([FromQuery] PaginationDTO pagination)
+        public async Task<IActionResult> AdminGetAll([FromQuery] PaginationDTO pagination, [FromQuery] PublishStatus status, [FromQuery] string search = null)
         {
-            return Ok(await _routeService.AdminGetEngriskAllRouteAsync(pagination));
+            return Ok(await _routeService.AdminGetEngriskAllRouteAsync(pagination, status, search));
+        }
+        [HttpGet("overview")]
+        public async Task<IActionResult> GetRouteOverview([FromQuery] DateRangeDTO dateRange){
+            return Ok(await _routeService.GetRouteOverviewAsync(dateRange));
         }
         [HttpGet("{id}")]
         public async Task<IActionResult> GetRouteDetail(Guid id)
         {
             return Ok(await _routeService.GetRouteDetailAsync(id));
+        }
+        [HttpGet("{id}/analyze")]
+        public async Task<IActionResult> GetRouteAnalyze(Guid id){
+            if(!await _routeService.CheckRouteExistAsync(id)){
+                return NotFound();
+            }
+            return Ok(await _routeService.GetRouteAnalyzeAsync(id));
         }
         [HttpGet("users/{id}/manage")]
         public async Task<IActionResult> GetUserRoute(int id, [FromQuery] PaginationDTO pagination, [FromQuery] bool isPrivate = true, [FromQuery] Status status = Status.Nope)
@@ -57,8 +69,31 @@ namespace Engrisk.Controllers.V2
         [HttpGet("users/{id}")]
         public async Task<IActionResult> GetEngriskRoute(int id)
         {
+            System.Console.WriteLine(HttpContext.Request.Headers["devicetype"]);
             var result = await _routeService.GetAllEngriskRouteAndProgressAsync(id);
             return Ok(result);
+        }
+        [Authorize]
+        [HttpGet("{id}/certificate/check")]
+        public async Task<IActionResult> CertificateRequestCheck(Guid id)
+        {
+            if (!await _routeService.CheckRouteExistAsync(id))
+            {
+                return NotFound();
+            }
+            int accountId = Int32.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            return Ok(await _routeService.RequestCertificateAsync(accountId, id));
+        }
+        [Authorize]
+        [HttpGet("{id}/certificate/claim")]
+        public async Task<IActionResult> CertificateClaimRequest(Guid id, [FromQuery] SignatureCertificateDTO signatureCertificateDTO)
+        {
+            if (!await _routeService.CheckRouteExistAsync(id))
+            {
+                return NotFound();
+            }
+            int accountId = Int32.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier));
+            return Ok(await _routeService.ClaimCertificateAsync(accountId, id, signatureCertificateDTO));
         }
         [HttpPost]
         public async Task<IActionResult> CreateRoute([FromForm] RouteCreateDTO routeCreate)
@@ -88,6 +123,25 @@ namespace Engrisk.Controllers.V2
                 return Ok();
             }
             return NoContent();
+        }
+        [HttpPut("{id}/publish/change")]
+        public async Task<IActionResult> ChangePublishStatus(Guid id, [FromQuery] PublishStatus status)
+        {
+            try
+            {
+                if (!await _routeService.CheckRouteExistAsync(id))
+                {
+                    return NotFound();
+                }
+                await _routeService.PublishAsync(id, status);
+                return Ok();
+            }
+            catch (System.Exception ex)
+            {
+                // TODO
+                return BadRequest(ex.Message);
+            }
+
         }
         [HttpPut("{id}/status")]
         public async Task<IActionResult> UpdateRouteStatus(Guid id)
@@ -139,21 +193,40 @@ namespace Engrisk.Controllers.V2
             {
                 return NotFound(new
                 {
-                    RouteExistError = "Lộ trình học không tồn tại"
+                    Status = 404,
+                    Error = "Lộ trình học không tồn tại"
+                });
+            }
+            if (!await _routeService.CheckRouteStatusAsync(routeId))
+            {
+                return BadRequest(new
+                {
+                    Status = 400,
+                    Error = "Lộ trình học hiện không sẵn sàng"
                 });
             }
             if (!await _routeService.CheckSectionExistAsync(routeId, sectionId))
             {
                 return NotFound(new
                 {
-                    SectionExistError = "Bài học không tồn tại hoặc thuộc lộ trình"
+                    Status = 400,
+                    Error = "Bài học không tồn tại hoặc thuộc lộ trình"
+                });
+            }
+            if (!await _routeService.CheckSectionStatusAsync(routeId, sectionId))
+            {
+                return BadRequest(new
+                {
+                    Status = 400,
+                    Error = "Bài học hiện không sẵn sàng"
                 });
             }
             if (!await _sectionService.CheckSectionScriptExistAsync(sectionId, scriptId))
             {
                 return NotFound(new
                 {
-                    ScriptExistError = "Kịch bản không tồn tại hoặc thuộc bài học"
+                    Status = 404,
+                    Error = "Kịch bản không tồn tại hoặc thuộc bài học"
                 });
             }
             //Người dùng đã đăng nhập
@@ -175,6 +248,7 @@ namespace Engrisk.Controllers.V2
                         //If not return bad request status
                         return BadRequest(new
                         {
+                            Status = 400,
                             Error = "Bạn phải hoàn thành bài học trước đó"
                         });
                     }
@@ -187,6 +261,7 @@ namespace Engrisk.Controllers.V2
             {
                 return BadRequest(new
                 {
+                    Status = 400,
                     Error = "Bạn phải đăng nhập để học bài này"
                 });
             }

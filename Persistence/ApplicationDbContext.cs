@@ -89,7 +89,8 @@ namespace Persistence
         public DbSet<Certificate> Certificates { get; set; }
         public DbSet<AccountCertificate> AccountCertificates { get; set; }
         public DbSet<CategoryTag> CategoryTags { get; set; }
-        public DbSet<WordCategoryTag> WordCategoryTags{ get; set; }
+        public DbSet<WordCategoryTag> WordCategoryTags { get; set; }
+        public DbSet<AccountAnswer> AccountAnswers { get; set; }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             base.OnConfiguring(optionsBuilder);
@@ -99,34 +100,34 @@ namespace Persistence
             base.OnModelCreating(builder);
             builder.Entity<LikedComment>().HasKey(key => new { key.AccountId, key.CommentId });
             builder.Entity<Account>(acc =>
-                        {
-                            acc.HasIndex(acc => acc.UserName).IsUnique();
-                            acc.HasIndex(acc => acc.Email).IsUnique();
-                            acc.HasIndex(acc => acc.PhoneNumber).IsUnique();
+            {
+                acc.HasIndex(acc => acc.UserName).IsUnique();
+                acc.HasIndex(acc => acc.Email).IsUnique();
+                acc.HasIndex(acc => acc.PhoneNumber).IsUnique();
 
-                            // acc.HasMany(m => m.AccountBadges).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
-                            // acc.HasMany(m => m.Attendences).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
-                            acc.HasMany(m => m.Posts).WithOne(o => o.Account).OnDelete(DeleteBehavior.SetNull);
-                            // acc.HasMany(m => m.LikedPosts).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                // acc.HasMany(m => m.AccountBadges).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                // acc.HasMany(m => m.Attendences).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                acc.HasMany(m => m.Posts).WithOne(o => o.Account).OnDelete(DeleteBehavior.SetNull);
+                // acc.HasMany(m => m.LikedPosts).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
 
 
-                            // acc.HasMany(m => m.Groups).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                // acc.HasMany(m => m.Groups).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
 
-                            // acc.HasMany(m => m.Histories).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
-                            // acc.HasMany(m => m.Storage).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
-                            // acc.HasMany(m => m.Learned).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
-                            acc.HasMany(m => m.Cardmems).WithOne(o => o.Account).HasForeignKey(key => key.AccountId).OnDelete(DeleteBehavior.Restrict);
+                // acc.HasMany(m => m.Histories).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                // acc.HasMany(m => m.Storage).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                // acc.HasMany(m => m.Learned).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                acc.HasMany(m => m.Cardmems).WithOne(o => o.Account).HasForeignKey(key => key.AccountId).OnDelete(DeleteBehavior.Restrict);
 
-                            acc.HasMany(m => m.ReceivedNotification).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
-                            acc.HasMany(m => m.CreatedNotification).WithOne(o => o.From).OnDelete(DeleteBehavior.Cascade);
-                            acc.HasMany(m => m.LikedComments).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
-                            acc.HasMany(m => m.BoxChats).WithOne(o => o.Account).OnDelete(DeleteBehavior.Restrict);
-                            acc.HasMany(m => m.DayStudies).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
-                            acc.HasMany(m => m.Routes).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
-                            acc.HasMany(m => m.SectionProgresses).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
-                            acc.HasMany(m => m.Certificates).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
-                            acc.HasMany(m => m.Questions).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
-                        });
+                acc.HasMany(m => m.ReceivedNotification).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                acc.HasMany(m => m.CreatedNotification).WithOne(o => o.From).OnDelete(DeleteBehavior.Cascade);
+                acc.HasMany(m => m.LikedComments).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                acc.HasMany(m => m.BoxChats).WithOne(o => o.Account).OnDelete(DeleteBehavior.Restrict);
+                acc.HasMany(m => m.DayStudies).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                acc.HasMany(m => m.Routes).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                acc.HasMany(m => m.SectionProgresses).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                acc.HasMany(m => m.Certificates).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+                acc.HasMany(m => m.Questions).WithOne(o => o.Account).OnDelete(DeleteBehavior.Cascade);
+            });
             //Account Role
 
             builder.Entity<AccountRole>(role =>
@@ -166,6 +167,7 @@ namespace Persistence
             builder.Entity<Quiz>(q =>
             {
                 q.Property(prop => prop.VerifiedStatus).HasConversion<string>();
+                q.Property(prop => prop.PublishStatus).HasConversion<string>();
                 q.HasMany(m => m.Questions).WithOne(o => o.Quiz).OnDelete(DeleteBehavior.Cascade);
                 q.Property(q => q.DifficultLevel).HasConversion<string>();
             });
@@ -173,9 +175,11 @@ namespace Persistence
             //Section entity
             builder.Entity<Section>(section =>
             {
+                section.Property(prop => prop.PublishStatus).HasConversion<string>();
                 section.HasMany(m => m.WordCategories).WithOne(o => o.Section).OnDelete(DeleteBehavior.SetNull);
                 section.HasMany(m => m.SectionProgresses).WithOne(o => o.Section).OnDelete(DeleteBehavior.Cascade);
                 section.HasMany(m => m.Scripts).WithOne(o => o.Section).OnDelete(DeleteBehavior.Cascade);
+                section.HasOne(o => o.Route).WithMany(m => m.Sections).OnDelete(DeleteBehavior.SetNull);
             });
 
             builder.Entity<ScriptQuestion>(sq =>
@@ -187,8 +191,8 @@ namespace Persistence
             builder.Entity<ScriptWord>(sw =>
             {
                 sw.HasKey(key => new { key.ScriptId, key.WordId });
-                sw.HasOne(o => o.Script).WithMany(m => m.Words).OnDelete(DeleteBehavior.Restrict);
-                sw.HasOne(o => o.Word).WithMany(m => m.Scripts).OnDelete(DeleteBehavior.Restrict);
+                sw.HasOne(o => o.Script).WithMany(m => m.Words).OnDelete(DeleteBehavior.Cascade);
+                sw.HasOne(o => o.Word).WithMany(m => m.Scripts).OnDelete(DeleteBehavior.Cascade);
             });
             //ExamQuestion Entity
             builder.Entity<ExamQuestion>(exam =>
@@ -201,11 +205,21 @@ namespace Persistence
             builder.Entity<Exam>(e =>
             {
                 e.Property(prop => prop.VerifiedStatus).HasConversion<string>();
+                e.Property(prop => prop.Purpose).HasConversion<string>();
+                e.Property(prop => prop.PublishStatus).HasConversion<string>();
                 e.HasMany(m => m.Questions).WithOne(o => o.Exam).OnDelete(DeleteBehavior.Cascade);
                 e.Property(prop => prop.Difficult).HasConversion<string>();
+                e.Property(prop => prop.StartPage).HasConversion<string>();
+                e.Property(prop => prop.EndPage).HasConversion<string>();
             });
-
-
+            builder.Entity<ExamHistory>(eh =>
+            {   
+                eh.HasMany(m => m.AccountAnswers).WithOne(o => o.ExamHistory).OnDelete(DeleteBehavior.SetNull);
+            });
+            builder.Entity<AccountAnswer>(aa => {
+                aa.HasOne(o => o.Question).WithMany(m => m.AccountAnswers).OnDelete(DeleteBehavior.Restrict);
+                aa.HasOne(o => o.Answer).WithMany(m => m.AccountAnswers).OnDelete(DeleteBehavior.Cascade);
+            });
             //AccountMission Entity
             builder.Entity<AccountMission>().HasKey(key => new { key.AccountId, key.DailyMissionId });
             builder.Entity<AccountMission>().HasOne(o => o.Account)
@@ -246,11 +260,15 @@ namespace Persistence
             {
                 word.Property(prop => prop.Type).HasConversion<string>();
                 word.Property(prop => prop.Class).HasConversion<string>();
+                word.Property(prop => prop.PublishStatus).HasConversion<string>();
+                word.Property(prop => prop.Status).HasConversion<string>();
                 word.HasMany(m => m.Families).WithOne(o => o.Family).OnDelete(DeleteBehavior.Restrict);
                 word.HasMany(m => m.Synonyms).WithOne(o => o.Synonym).OnDelete(DeleteBehavior.Restrict);
                 word.HasMany(m => m.Examples).WithOne(o => o.Word).OnDelete(DeleteBehavior.Cascade);
                 word.HasMany(m => m.Groups).WithOne(o => o.Word).OnDelete(DeleteBehavior.Cascade);
                 word.HasMany(m => m.Learned).WithOne(o => o.Word).OnDelete(DeleteBehavior.Cascade);
+                word.HasMany(m => m.Questions).WithOne(o => o.Word).OnDelete(DeleteBehavior.Cascade);
+                word.HasMany(m => m.Scripts).WithOne(o => o.Word).OnDelete(DeleteBehavior.Cascade);
             });
 
             builder.Entity<Group>().HasMany(m => m.Words).WithOne(o => o.Group).OnDelete(DeleteBehavior.Cascade);
@@ -301,9 +319,11 @@ namespace Persistence
                 q.Property(prop => prop.Toeic).HasConversion<string>();
                 q.Property(prop => prop.Grammar).HasConversion<string>();
                 q.Property(prop => prop.Type).HasConversion<string>();
+                q.Property(prop => prop.Status).HasConversion<string>();
                 q.HasMany(m => m.Quizes).WithOne(o => o.Question).OnDelete(DeleteBehavior.Cascade);
                 q.HasMany(m => m.Exams).WithOne(o => o.Question).OnDelete(DeleteBehavior.Cascade);
                 q.HasOne(o => o.Account).WithMany(m => m.Questions).OnDelete(DeleteBehavior.Restrict);
+                q.HasMany(m => m.Words).WithOne(o => o.Question).OnDelete(DeleteBehavior.Cascade);
             });
 
             //Exam tài khoản tự tạo
@@ -372,8 +392,8 @@ namespace Persistence
             builder.Entity<WordQuestion>(wq =>
             {
                 wq.HasKey(key => new { key.WordId, key.QuestionId });
-                wq.HasOne(o => o.Question).WithMany(m => m.Words).OnDelete(DeleteBehavior.Restrict);
-                wq.HasOne(o => o.Word).WithMany(m => m.Questions).OnDelete(DeleteBehavior.Restrict);
+                wq.HasOne(o => o.Question).WithMany(m => m.Words).OnDelete(DeleteBehavior.Cascade);
+                wq.HasOne(o => o.Word).WithMany(m => m.Questions).OnDelete(DeleteBehavior.Cascade);
             });
             builder.Entity<BoxChat>(bc =>
             {
@@ -413,8 +433,9 @@ namespace Persistence
             });
             builder.Entity<Route>(route =>
             {
+                route.Property(prop => prop.PublishStatus).HasConversion<string>();
                 route.Property(prop => prop.VerifiedStatus).HasConversion<string>();
-                route.HasMany(m => m.Sections).WithOne(o => o.Route).OnDelete(DeleteBehavior.ClientSetNull);
+                route.HasMany(m => m.Sections).WithOne(o => o.Route).OnDelete(DeleteBehavior.SetNull);
             });
             builder.Entity<SectionDetailProgress>(sd =>
             {
@@ -436,13 +457,14 @@ namespace Persistence
                 script.HasMany(m => m.Questions).WithOne(o => o.Script).OnDelete(DeleteBehavior.Cascade);
                 script.HasMany(m => m.Progresses).WithOne(o => o.Script).OnDelete(DeleteBehavior.Cascade);
             });
-            builder.Entity<AccountCertificate>(ac => {
-                ac.HasKey(key => new {key.AccountId,key.CertificateId});
+            builder.Entity<AccountCertificate>(ac =>
+            {
                 ac.HasOne(o => o.Account).WithMany(m => m.Certificates);
                 ac.HasOne(o => o.Certificate).WithMany(m => m.Accounts);
             });
-            builder.Entity<WordCategoryTag>(wct => {
-                wct.HasKey(key => new {key.WordCategoryId,key.CategoryTagId});
+            builder.Entity<WordCategoryTag>(wct =>
+            {
+                wct.HasKey(key => new { key.WordCategoryId, key.CategoryTagId });
                 wct.HasOne(o => o.CategoryTag).WithMany(m => m.Categories).OnDelete(DeleteBehavior.Cascade);
                 wct.HasOne(o => o.WordCategory).WithMany(m => m.Tags).OnDelete(DeleteBehavior.Cascade);
             });

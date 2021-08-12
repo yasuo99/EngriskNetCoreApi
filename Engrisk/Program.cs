@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Persistence;
+using System.IO;
 
 namespace Engrisk
 {
@@ -21,32 +22,35 @@ namespace Engrisk
     {
         public static void Main(string[] args)
         {
-            var host = CreateHostBuilder(args).Build();
-            using(var scope = host.Services.CreateScope()){
-                var services = scope.ServiceProvider;
-                try
-                {
-                    var context = services.GetRequiredService<ApplicationDbContext>();
-                    var userManager = services.GetRequiredService<UserManager<Account>>();
-                    var roleManager = services.GetRequiredService<RoleManager<Role>>();
-                    context.Database.Migrate();
-                    Seed.SeedData(context, userManager,roleManager);
-                }
-                catch (System.Exception ex)
-                {
-                    var logger = services.GetRequiredService<ILogger<Program>>();
-                    logger.LogError(ex,"Error");
-                    throw;
-                }
-            }
+            var host = CreateHostBuilder(args).Build();;
+            // using(var scope = host.Services.CreateScope()){
+            //     var services = scope.ServiceProvider;
+            //     try
             host.Run();
         }
+            //     {
+            //         var context = services.GetRequiredService<ApplicationDbContext>();
+            //         var userManager = services.GetRequiredService<UserManager<Account>>();
+            //         var roleManager = services.GetRequiredService<RoleManager<Role>>();
+            //         context.Database.Migrate();
+            //         Seed.SeedData(context, userManager,roleManager);
+            //     }
+            //     catch (System.Exception ex)
+            //     {
+            //         var logger = services.GetRequiredService<ILogger<Program>>();
+            //         logger.LogError(ex,"Error");
+            //         throw;
+            //     }
+            // }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
             Host.CreateDefaultBuilder(args)
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder.UseStartup<Startup>();
+                    webBuilder.UseKestrel();
+                    webBuilder.UseContentRoot(Directory.GetCurrentDirectory());
+                    webBuilder.UseIISIntegration();
                 });
     }
 }

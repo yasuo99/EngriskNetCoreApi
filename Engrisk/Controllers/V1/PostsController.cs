@@ -239,37 +239,6 @@ namespace Engrisk.Controllers.V1
             _repo.Create(commentToPost);
             if (await _repo.SaveAll())
             {
-                var commentDTO = _mapper.Map<CommentDTO>(commentToPost);
-                var client = HubHelper.NotificationClientsConnections.FirstOrDefault(client => client.AccountId == userId);
-                await _hub.Clients.Client(client.ClientId).SendAsync("NewComment", commentDTO.CamelcaseSerialize());
-                if (userId != postFromDb.AccountId)
-                {
-                    var postOwner = HubHelper.NotificationClientsConnections.FirstOrDefault(client => client.AccountId == postFromDb.AccountId);
-                    var notification = new Notification
-                    {
-                        Content = $"{accountFromDb.UserName} đã bình luận vào bài viết của bạn",
-                        Url = $"/thao-luan-chi-tiet/{id}",
-                        FromId = accountFromDb.Id
-                    };
-                    if (!await _repo.Exists<Notification>(notify => notify.Content.Equals(notification.Content) && notify.FromId == accountFromDb.Id))
-                    {
-                        accountFromDb.CreatedNotification.Add(notification);
-                        var receiver = await _repo.GetOneWithConditionTracking<Account>(acc => acc.Id == postFromDb.AccountId);
-                        receiver.ReceivedNotification.Add(new AccountNotification
-                        {
-                            Notification = notification,
-                            Status = Domain.Enums.NotificationStatus.Unseen
-                        });
-                        _repo.Create(notification);
-                        await _repo.SaveAll();
-                        var returnNotification = _mapper.Map<ResponseNotificationDTO>(notification);
-                        if (postOwner != null)
-                        {
-                            await _hub.Clients.Client(postOwner.ClientId).SendAsync("NewNotification", Extension.CamelCaseSerialize(returnNotification));
-                        }
-                        return Ok();
-                    }
-                }
                 return Ok();
             }
             return StatusCode(500);

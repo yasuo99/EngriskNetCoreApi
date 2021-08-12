@@ -5,6 +5,7 @@ namespace Domain.Models.Version2
 {
     public class AccountCertificate
     {
+        public Guid Id { get; set; }
         public int AccountId { get; set; }
         [ForeignKey(nameof(AccountId))]
         public virtual Account Account { get; set; }

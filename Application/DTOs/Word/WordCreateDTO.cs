@@ -22,7 +22,7 @@ namespace Application.DTOs.Word
         public string Spelling { get; set; }
         public string EngVoice { get; set; } = "en-US";
         public string Vie { get; set; }
-        public WordClasses WordClasses{get;set;}
+        public WordClasses Class{get;set;}
         public List<WordCategoryDTO> Categories{get;set;}
         public List<ExampleDTO> Examples { get; set; }
     }

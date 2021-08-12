@@ -19,6 +19,7 @@ namespace Domain.Models.Version2
         public int VocabularySetting { get; set; } = 1;
         public ScriptTypes Type { get; set; }
         public virtual Exam MiniExam { get; set; }
+        public virtual Certificate Certificate { get; set; }
         public virtual ICollection<ScriptQuestion> Questions { get; set; }
         public virtual ICollection<ScriptWord> Words { get; set; }
         public virtual ICollection<SectionDetailProgress> Progresses { get; set; }

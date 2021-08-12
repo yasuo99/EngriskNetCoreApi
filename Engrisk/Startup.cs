@@ -20,6 +20,11 @@ using System.Threading.Tasks;
 using Application.Hubs;
 using MediatR;
 using Application.Mediator.Accounts;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.FileProviders;
+using System.IO;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.OpenApi.Models;
 
 namespace Engrisk
 {
@@ -79,7 +84,6 @@ namespace Engrisk
                         if (!string.IsNullOrEmpty(accessToken) && ((path.StartsWithSegments("/notification")) || path.StartsWithSegments("/message") || path.StartsWithSegments("/tournament")))
                         {
                             context.Token = accessToken;
-                            System.Console.WriteLine(accessToken);
                         }
                         return Task.CompletedTask;
                     }
@@ -94,8 +98,9 @@ namespace Engrisk
             // });
             services.AddDbContextPool<ApplicationDbContext>((serviceProvider, options) =>
             {
-                options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")).EnableSensitiveDataLogging();
+                options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection"));
                 options.UseInternalServiceProvider(serviceProvider);
+                options.EnableSensitiveDataLogging(true);
             });
             services.AddControllers(opts =>
             {
@@ -115,7 +120,7 @@ namespace Engrisk
             services.AddScoped<IAuthService, FacebookAuthService>();
             services.AddScoped<IFileService, FileService>();
             services.AddScoped<IUserService, UserService>();
-            
+
             services.Configure<CloudinarySettings>(Configuration.GetSection("CloudinarySettings"));
             services.Configure<GoogleAuthConfig>(Configuration.GetSection("Google"));
             services.Configure<FacebookAuthConfig>(Configuration.GetSection("Facebook"));
@@ -139,6 +144,16 @@ namespace Engrisk
             services.AddCors();
             services.AddSignalR();
             services.AddMediatR(typeof(List.Handler).Assembly);
+            services.AddSwaggerGen(c =>
+            {
+                c.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Version = "v1",
+                    Title = "Engrisk API",
+                    Description = "Engrisk .Net Core Web API",
+                    TermsOfService = new Uri("https://example.com/terms"),
+                });
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -152,21 +167,41 @@ namespace Engrisk
             {
                 app.UseMiddleware<ExceptionMiddleware>();
             }
+            app.UseSwagger();
+            app.UseSwaggerUI(opts =>
+          {
+              opts.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
+              opts.RoutePrefix = string.Empty;
+          });
             // app.UseHttpsRedirection();
             app.UseCors(options =>
             {
                 options.WithOrigins("http://localhost:3000").AllowCredentials().AllowAnyMethod().AllowAnyHeader();
             });
+            app.UseStaticFiles();// For the wwwroot folder
+
+            var file = new PhysicalFileProvider(
+                                Path.Combine(Directory.GetCurrentDirectory(), "/TLCN/Backend/Engrisk/assets"));
+            app.UseFileServer(new FileServerOptions
+            {
+                FileProvider = file,
+                RequestPath = "/assets",
+                EnableDefaultFiles = true
+            });
             app.UseRouting();
+            app.UseForwardedHeaders(new ForwardedHeadersOptions
+            {
+                ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+            });
             app.UseAuthentication();
             app.UseAuthorization();
-
             app.UseEndpoints(endpoints =>
             {
+                endpoints.MapControllers();
                 endpoints.MapHub<NotificationHub>("/notification");
                 endpoints.MapHub<MessageHub>("/notification/signalr");
                 endpoints.MapHub<ExamHub>("/tournament");
-                endpoints.MapControllers();
+
             });
         }
     }

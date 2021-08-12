@@ -13,7 +13,9 @@ namespace Application.DTOs.Quiz
         public string QuizName { get; set; }
         public string DifficultLevel { get; set; }
         public string CreatedBy { get; set; }
-         public virtual AccountBlogDTO Owner { get; set; }
+        public string PublishStatus { get; set; }
+        public int AccessCount { get; set; }
+        public virtual AccountBlogDTO Owner { get; set; }
         public virtual List<QuestionDTO> Questions { get; set; }
     }
 }

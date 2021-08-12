@@ -64,20 +64,34 @@ namespace Application.Services.Core
             return _wordCategory != null;
         }
 
-        public async Task<PaginateDTO<WordCategory>> GetAllAsync(PaginationDTO pagination, string search = null, bool learn = false, string tag = "all")
+        public async Task<PaginateDTO<WordCategory>> GetAllAsync(PaginationDTO pagination, bool manage, string search = null, bool learn = false, string tag = "all")
         {
-            var wordCategories = await _context.WordCategories.Include(inc => inc.Words).Include(inc => inc.Tags).ThenInclude(inc => inc.CategoryTag).OrderByDescending(orderBy => orderBy.CreatedDate).AsNoTracking().ToListAsync();
-            if(search != null){
-                wordCategories = wordCategories.Where(wc => wc.CategoryName.ToLower().Contains(search.Trim().ToLower())).ToList();
+            var wordCategories = from wc in _context.WordCategories.OrderByDescending(orderBy => orderBy.UpdatedDate).OrderByDescending(orderBy => orderBy.CreatedDate).AsNoTracking() select wc;
+            if (!manage)
+            {
+                wordCategories = wordCategories.Where(wc => wc.Words.Count > 0);
             }
-            if(learn){
-                wordCategories = wordCategories.Where(wc => wc.Words.Count > 0).ToList();
+            if (search != null)
+            {
+                wordCategories = wordCategories.Where(wc => wc.CategoryName.ToLower().Contains(search.Trim().ToLower()));
             }
-            if(tag != "all"){
-                wordCategories = wordCategories.Where(wc => wc.Tags.Any(val => val.CategoryTag.Tag.ToLower().Equals(tag.ToLower()))).ToList();
+            if (learn)
+            {
+                wordCategories = wordCategories.Where(wc => wc.Words.Count > 0);
             }
-            var paginateWordCategories = PagingList<WordCategory>.OnCreate(wordCategories, pagination.CurrentPage, pagination.PageSize);
-            return paginateWordCategories.CreatePaginate();
+            if (tag != "all")
+            {
+                wordCategories = wordCategories.Where(wc => wc.Tags.Any(val => val.CategoryTag.Tag.ToLower().Equals(tag.ToLower())));
+            }
+
+            var paginateWordCategories = await PagingList<WordCategory>.OnCreateAsync(wordCategories, pagination.CurrentPage, pagination.PageSize);
+            var result = paginateWordCategories.CreatePaginate();
+            foreach(var category in result.Items){
+                category.Words = await _context.Categories.Where(c => c.WordCategoryId == category.Id && c.Word.PublishStatus == Domain.Enums.PublishStatus.Published).AsNoTracking().ToListAsync();
+                category.Tags = await _context.WordCategoryTags.Where(c => c.WordCategoryId == category.Id).AsNoTracking().ToListAsync();
+            }
+            return result;
+            
         }
 
         public async Task<List<WordCategoryDTO>> GetAllAsync()
@@ -91,7 +105,7 @@ namespace Application.Services.Core
             var wordCategory = await _context.WordCategories.Where(predicate: wc => wc.Id == id).AsNoTracking()
             .FirstOrDefaultAsync();
             var wordCategoryDTO = _mapper.Map<WordCategoryDTO>(wordCategory);
-            wordCategoryDTO.Vocabulary = _mapper.Map<List<WordDTO>>(await _context.Categories.Where(c => c.WordCategoryId == id).Include(inc => inc.Word).ThenInclude(inc => inc.Memories).Select(sel => sel.Word).ToListAsync());
+            wordCategoryDTO.Vocabulary = _mapper.Map<List<WordDTO>>(await _context.Categories.Where(c => c.WordCategoryId == id && c.Word.PublishStatus == Domain.Enums.PublishStatus.Published).Include(inc => inc.Word).ThenInclude(inc => inc.Memories).Select(sel => sel.Word).ToListAsync());
             return wordCategoryDTO;
         }
 
@@ -99,11 +113,12 @@ namespace Application.Services.Core
         {
             List<Question> questions = new List<Question>();
             var wordCategory = await GetDetailAsync(categoryId);
-            // foreach(var word in wordCategory.Words){
-            //     var questionsOfWord = await _context.WordQuestions.Where(wq => wq.WordId == word.Id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).Select(sl => sl.Question).AsNoTracking().ToListAsync();
-            //     var question = questionsOfWord.GetOneRandomFromList();
-            //     questions.Add(question);
-            // }
+            foreach (var word in wordCategory.Vocabulary)
+            {
+                var questionsOfWord = await _context.WordQuestions.Where(wq => wq.WordId == word.Id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).Select(sl => sl.Question).AsNoTracking().ToListAsync();
+                var question = questionsOfWord.GetOneRandomFromList();
+                questions.Add(question);
+            }
             var returnQuestions = _mapper.Map<List<QuestionDTO>>(questions);
             return returnQuestions.Shuffle().ToList();
         }

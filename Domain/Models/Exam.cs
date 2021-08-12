@@ -16,6 +16,8 @@ namespace Domain.Models
             Accounts = new HashSet<AccountExam>();
             Shared = new HashSet<AccountShare>();
             VerifiedStatus = Status.Nope;
+            PublishStatus = PublishStatus.UnPublished;
+            Purpose = ExamPurposes.Test;
         }
         public string Title { get; set; }
         public string Detail { get; set; }
@@ -23,10 +25,15 @@ namespace Domain.Models
         public int TotalListening { get; set; }
         public int TotalReading { get; set; }
         public int TotalScore { get; set; } = 0;
+        public int PassScore { get; set; }
         public int Duration { get; set; }
+        public ExamPurposes Purpose { get; set; }
         public bool IsPrivate { get; set; } = false;
         public int AccessCount { get; set; }
         public Status VerifiedStatus { get; set; }
+        public PublishStatus PublishStatus { get; set; }
+        public ExamStartPageType StartPage { get; set; }
+        public ExamEndPageType EndPage { get; set; }
         public Guid? ScriptId { get; set; }
         public virtual Script Script { get; set; }
         public virtual ExamOnlineSchedule Schedule { get; set; }

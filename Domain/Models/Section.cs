@@ -13,11 +13,13 @@ namespace Domain.Models
         {
             SectionProgresses = new HashSet<SectionProgress>();
             Scripts = new HashSet<Script>();
+            PublishStatus = PublishStatus.UnPublished;
         }
         public string PhotoUrl { get; set; }
         public string SectionName { get; set; }
         public string Description { get; set; }
         public bool RequireLogin { get; set; }
+        public PublishStatus PublishStatus { get; set; }
         public int Index { get; set; }
         public Guid? RouteId { get; set; }
         [ForeignKey(nameof(RouteId))]

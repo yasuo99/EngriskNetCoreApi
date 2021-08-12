@@ -11,8 +11,10 @@ namespace Application.DTOs.Account.Route
         public string Description { get; set; }
         public string RouteImage { get; set; }
         public bool IsPrivate { get; set; }
+        public bool IsSequentially { get; set; }
         public int Done { get; set; }
         public DateTime CreatedDate { get; set; }
+        public DateTime UpdatedDate { get; set; }
         public List<SectionLearnDTO> Sections { get; set; }
     }
 }

@@ -13,10 +13,9 @@ using Domain.Models;
 
 namespace Application.Services.Core.Abstraction
 {
-    public interface ISectionService
+    public interface ISectionService: IPublishService
     {
         Task<bool> CheckAnonymousLearnAsync(Guid id);
-
         Task<bool> CheckExistAsync(Guid sectionId);
         Task<bool> CheckProgressAsync(int accountId);
         Task<bool> CheckPreviousSectionDoneAsync(Guid id, int accountId);

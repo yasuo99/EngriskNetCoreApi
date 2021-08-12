@@ -32,5 +32,9 @@ namespace Engrisk.Controllers.V2
         public async Task<IActionResult> GetDashboard(){
             return Ok(await _adminService.GetDashboardAsync());
         }
+        [HttpGet("route/overview")]
+        public async Task<IActionResult> GetRouteOverview(){
+            return Ok();
+        }
     }
 }

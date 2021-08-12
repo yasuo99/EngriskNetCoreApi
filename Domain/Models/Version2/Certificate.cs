@@ -7,13 +7,17 @@ namespace Domain.Models.Version2
 {
     public class Certificate : AuditEntity<Guid>
     {
+        public Certificate()
+        {
+            Accounts = new HashSet<AccountCertificate>();
+        }
         public string Subject { get; set; }
         public string Title { get; set; }
         public string Template { get; set; }
         public int LifeTime { get; set; }
-        public Guid? RouteId { get; set; }
-        [ForeignKey(nameof(RouteId))]
-        public virtual Route Route { get; set; }
+        public Guid? ScriptId { get; set; }
+        [ForeignKey(nameof(ScriptId))]
+        public virtual Script Script { get; set; }
         public virtual ICollection<AccountCertificate> Accounts { get; set; }
 
     }

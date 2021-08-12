@@ -112,7 +112,7 @@ namespace Engrisk.Controllers.V2
             await _service.SwitchNotificationAsync(follower, following);
             return Ok();
         }
-        [Authorize(Roles = "TEACHER")]
+        [Authorize]
         [HttpPost("{id}/boxchat")]
         public async Task<IActionResult> CreatePrivateBoxChat(int id, [FromBody] BoxChat boxChat)
         {
@@ -123,9 +123,14 @@ namespace Engrisk.Controllers.V2
 
             return Ok();
         }
+        [Authorize]
         [HttpGet("{id}/boxchat/{boxchatId}")]
         public async Task<IActionResult> SendInvite(int id, Guid boxchatId, [FromQuery] int receiverId)
         {
+            if (!await _service.CheckBoxchatOwnerAsync(boxchatId, id))
+            {
+                return BadRequest();
+            }
             await _service.InviteUserToBoxchat(receiverId, boxchatId);
             return Ok();
         }
@@ -276,16 +281,40 @@ namespace Engrisk.Controllers.V2
             return NoContent();
         }
         //Boxchat
+        [Authorize]
         [HttpPost("{id}/boxchats")]
-        public async Task<IActionResult> CreateBoxchat([FromBody] BoxchatCreateDTO boxchatCreateDTO)
+        public async Task<IActionResult> CreateBoxchat(int id, [FromBody] BoxchatCreateDTO boxchatCreateDTO)
         {
-            return Ok();
+            try
+            {
+                if (Int32.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)) != id)
+                {
+                    return Unauthorized();
+                }
+                var boxchat = await _service.CreateBoxChatAsync(id, boxchatCreateDTO);
+                if (boxchat != null)
+                {
+                    return Ok();
+                }
+                return NoContent();
+            }
+            catch (System.Exception ex)
+            {
+                // TODO
+                return BadRequest(ex);
+            }
         }
+        [Authorize]
         [HttpGet("{id}/boxchats")]
         public async Task<IActionResult> GetUserBoxChat(int id)
         {
+            if (id != Int32.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)))
+            {
+                return Unauthorized();
+            }
             return Ok(await _service.GetUserBoxchatAsync(id));
         }
+        [Authorize]
         [HttpGet("{id}/boxchats/{boxchatId}")]
         public async Task<IActionResult> GetBoxchatDetail(int id, Guid boxchatId)
         {
@@ -293,6 +322,21 @@ namespace Engrisk.Controllers.V2
             //     return Unauthorized();
             // }
             return Ok(await _service.GetBoxchatMessageAsync(id, boxchatId));
+        }
+        [Authorize]
+        [HttpPut("{id}/boxchats/{boxchatId}")]
+        public async Task<IActionResult> UpdateBoxchat(int id, Guid boxchatId, [FromBody] BoxchatUpdateDTO boxchat){
+            if (id != Int32.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)))
+            {
+                return Unauthorized();
+            }
+            if(!await _service.CheckBoxchatOwnerAsync(boxchatId,id)){
+                return BadRequest();
+            }
+            if(await _service.UpdateBoxchatAsync(boxchatId,boxchat)){
+                return Ok();
+            }
+            return NoContent();
         }
         [Authorize]
         [HttpPut("{id}/boxchats/{boxchatId}/members")]
@@ -310,6 +354,21 @@ namespace Engrisk.Controllers.V2
             return Ok();
         }
         [Authorize]
+        [HttpDelete("{id}/boxchats/{boxchatId}")]
+        public async Task<IActionResult> DeleteBoxchat(int id, Guid boxchatId){
+            if (id != Int32.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)))
+            {
+                return Unauthorized();
+            }
+            if(!await _service.CheckBoxchatOwnerAsync(boxchatId,id)){
+                return BadRequest();
+            }
+            if(await _service.DeleteBoxchatAsync(boxchatId)){
+                return Ok();
+            }
+            return NoContent();
+        }
+        [Authorize]
         [HttpPut("{id}/notifications/{notificationId}/invite")]
         public async Task<IActionResult> ResponseToInvite(int id, Guid notificationId, [FromQuery] string action)
         {
@@ -324,10 +383,34 @@ namespace Engrisk.Controllers.V2
             await _service.AcceptBoxChatInvite(id, notificationId, action);
             return Ok();
         }
+        [Authorize]
         [HttpGet("{id}/learning/history")]
         public async Task<IActionResult> GetLearningHistory(int id, [FromQuery] DateRangeDTO dateRange)
         {
+            if (Int32.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)) != id)
+            {
+                return Unauthorized();
+            }
             return Ok(await _service.GetDailyLearningAsync(id, dateRange));
+        }
+        [Authorize]
+        [HttpPut("{id}/routes/{routeId}/select")]
+        public async Task<IActionResult> SelectRoute(int id, Guid routeId)
+        {
+            if (Int32.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)) != id)
+            {
+                return Unauthorized();
+            }
+            if (await _service.SelectRouteAsync(id, routeId))
+            {
+                return Ok();
+            }
+            return NoContent();
+        }
+        //Data
+        [HttpGet("{id}/data/{routeId}")]
+        public async Task<IActionResult> MakeRouteFinish(int id, Guid routeId){
+            return Ok( await _service.MakeUserFinishRouteAsync(id,routeId));
         }
     }
 }

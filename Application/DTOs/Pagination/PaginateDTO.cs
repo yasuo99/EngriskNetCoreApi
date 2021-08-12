@@ -29,8 +29,8 @@ namespace Application.DTOs.Pagination
             get { return totalItems; }
             set { totalItems = value; }
         }
-        private PagingList<T> items;
-        public PagingList<T> Items
+        private List<T> items;
+        public List<T> Items
         {
             get { return items; }
             set { items = value; }
@@ -42,7 +42,9 @@ namespace Application.DTOs.Pagination
             set { itemsOnPage = value; }
         }
         
-        
+        public PaginateDTO()
+        {
+        }
         public PaginateDTO(int currentPage, int pageSize, int totalPages, int totalItems, int itemsOnPage, PagingList<T> items)
         {
             CurrentPage = currentPage;

@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+https://go.microsoft.com/fwlink/?LinkID=208121. 
+-->
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <_PublishTargetUrl>C:\Users\Thanh\Desktop\web</_PublishTargetUrl>
+    <History>True|2021-08-06T07:03:42.9946226Z;True|2021-07-25T19:53:02.7863703+07:00;True|2021-07-25T18:43:42.1902272+07:00;True|2021-07-25T16:08:07.2976486+07:00;False|2021-07-25T16:07:21.9931515+07:00;True|2021-07-25T15:59:17.4005666+07:00;True|2021-07-25T14:28:48.4353401+07:00;True|2021-07-25T14:09:59.9965460+07:00;True|2021-07-25T13:52:07.6950391+07:00;True|2021-07-24T19:53:28.9083468+07:00;True|2021-07-24T19:47:30.5253070+07:00;True|2021-07-24T19:46:07.9688801+07:00;True|2021-07-24T19:44:20.1512108+07:00;True|2021-07-24T19:40:52.7944980+07:00;True|2021-07-24T19:38:08.1828039+07:00;True|2021-07-24T19:36:39.6602343+07:00;True|2021-07-24T19:30:42.0386666+07:00;True|2021-07-24T19:28:07.3420645+07:00;True|2021-07-24T19:23:01.4598412+07:00;True|2021-07-24T19:16:48.6221594+07:00;True|2021-07-24T19:09:15.0535092+07:00;True|2021-07-24T19:06:34.9592130+07:00;True|2021-07-24T18:58:44.3711612+07:00;True|2021-07-24T18:54:16.8522920+07:00;True|2021-07-24T18:47:53.3368610+07:00;</History>
+    <TimeStampOfAssociatedLegacyPublishXmlFile />
+  </PropertyGroup>
+  <ItemGroup>
+    <DestinationConnectionStrings Include="DefaultConnection">
+      <Value>Server=NGUYENLAP%3bDatabase=Engrisk%3bTrusted_Connection=True%3b</Value>
+    </DestinationConnectionStrings>
+  </ItemGroup>
+  <ItemGroup>
+    <EFMigrations Include="Persistence.ApplicationDbContext">
+      <Value>Server=NGUYENLAP%3bDatabase=Engrisk%3bTrusted_Connection=True%3b</Value>
+    </EFMigrations>
+  </ItemGroup>
+</Project>

@@ -27,16 +27,18 @@ namespace Application.Services.Core
         private IFileService _fileService;
         private IQuestionService _questionService;
         private INotificationService _notificationService;
+        private ICertificateService _certificateService;
         private Account _account;
         private Exam _exam;
         private AccountExam _accountExam;
-        public ExamService(ApplicationDbContext context, IMapper mapper, IFileService fileService, IQuestionService questionService, INotificationService notificationService)
+        public ExamService(ApplicationDbContext context, IMapper mapper, IFileService fileService, IQuestionService questionService, INotificationService notificationService, ICertificateService certificateService)
         {
             _context = context;
             _mapper = mapper;
             _fileService = fileService;
             _questionService = questionService;
             _notificationService = notificationService;
+            _certificateService = certificateService;
         }
         public async Task<Exam> CreateUserExamAsync(int accountId, ExamCreateDTO examCreateDTO)
         {
@@ -78,6 +80,8 @@ namespace Application.Services.Core
         public async Task<Exam> CreateExamAsync(ExamDTO examCreateDTO)
         {
             var exam = _mapper.Map<Exam>(examCreateDTO);
+            exam.PublishStatus = PublishStatus.UnPublished;
+            exam.Purpose = ExamPurposes.Test;
             _context.Exam.Add(exam);
             if (await _context.SaveChangesAsync() > 0)
             {
@@ -97,7 +101,7 @@ namespace Application.Services.Core
         {
             _exam ??= await _context.Exam.FirstOrDefaultAsync(exam => exam.Id == id);
             var returnExam = _mapper.Map<ExamDTO>(_exam);
-            var questions = await _context.ExamQuestions.Where(q => q.ExamId == id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).ToListAsync();
+            var questions = await _context.ExamQuestions.Where(q => q.ExamId == id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).OrderBy(orderBy => orderBy.Question.Toeic).ToListAsync();
             returnExam.Questions = _mapper.Map<IEnumerable<QuestionDTO>>(questions);
             var checkDoing = await _context.ExamHistories.AnyAsync(eh => eh.AccountId == accountId && eh.ExamId == id && eh.IsDoing);
             if (!checkDoing)
@@ -111,38 +115,12 @@ namespace Application.Services.Core
                         IsDoing = true,
                         Timestamp_start = DateTime.Now,
                         Timestamp_end = DateTime.Now.AddMinutes(_exam.Duration),
-                        CurrentQuestion = 0,
                     };
                     _context.ExamHistories.Add(examHistory);
                     await _context.SaveChangesAsync();
                 }
             }
             return returnExam;
-        }
-
-        public async Task PauseExam(Guid id, int accountId, int currentQuestion)
-        {
-            var examHistory = await _context.ExamHistories.FirstOrDefaultAsync(exam => exam.ExamId == id && exam.AccountId == accountId && exam.IsDoing);
-            examHistory.IsDoing = false;
-            examHistory.Timestamp_pause = DateTime.Now;
-            examHistory.CurrentQuestion = currentQuestion;
-            await _context.SaveChangesAsync();
-        }
-        public async Task<int> ResumeExam(Guid id, int accountId)
-        {
-            var examHistory = await _context.ExamHistories.FirstOrDefaultAsync(exam => exam.ExamId == id && exam.AccountId == accountId && exam.IsDoing == false && exam.Timestamp_pause != null);
-            if (examHistory == null)
-            {
-                return -1;
-            }
-            examHistory.IsDoing = true;
-            var exam = await _context.Exam.FirstOrDefaultAsync(e => e.Id == id);
-            var remainTime = examHistory.Timestamp_end.Subtract(examHistory.Timestamp_pause);
-            examHistory.TotalTime = (int)examHistory.Timestamp_pause.Subtract(examHistory.Timestamp_start).TotalMinutes;
-            examHistory.Timestamp_end = DateTime.Now.AddMinutes(remainTime.TotalMinutes);
-            examHistory.Timestamp_pause = DateTime.Now;
-            await _context.SaveChangesAsync();
-            return (int)remainTime.TotalMinutes;
         }
 
         public async Task<ExamResultDTO> SubmitExamAsync(Guid id, HashSet<DTOs.Answer.AnswerDTO> answers)
@@ -153,6 +131,10 @@ namespace Application.Services.Core
         public async Task<bool> UpdateExamAsync(Guid id, ExamDTO examCreateDTO)
         {
             var exam = await _context.Exam.Where(e => e.Id == id).Include(inc => inc.Questions).FirstOrDefaultAsync();
+            var newQuestions = examCreateDTO.Questions.Where(q => !exam.Questions.Any(question => question.QuestionId == q.Id)).Select(sel => sel.Id).ToList();
+            var removeQuestions = exam.Questions.Where(q => !examCreateDTO.Questions.Any(question => question.Id == q.QuestionId)).Select(sel => sel.QuestionId).ToList();
+            await _questionService.ChangeStatusAsync(newQuestions);
+            await _questionService.ChangeStatusAsync(removeQuestions);
             _mapper.Map(examCreateDTO, exam);
             if (await _context.SaveChangesAsync() > 0)
             {
@@ -173,16 +155,46 @@ namespace Application.Services.Core
             return returnValue.CreatePaginate();
         }
 
-        public async Task<PaginateDTO<ExamDTO>> GetExams(PaginationDTO pagination, Status status = Status.Pending, string search = null)
+        public async Task<PaginateDTO<ExamDTO>> GetExams(PaginationDTO pagination, ExamPurposes purpose = ExamPurposes.None, DifficultLevel difficult = DifficultLevel.None, string search = null, string sort = null)
         {
-            var exams = await _context.Exam.Where(exam => exam.VerifiedStatus == status).Include(inc => inc.Questions).ThenInclude(inc => inc.Question).ThenInclude(inc => inc.Answers).ToListAsync();
+            var exams = from e in _context.Exam.OrderByDescending(orderBy => orderBy.UpdatedDate).OrderByDescending(orderBy => orderBy.CreatedDate).AsNoTracking() select e;
+            if (purpose != ExamPurposes.None)
+            {
+                exams = exams.Where(e => e.Purpose == purpose);
+            }
+            if (difficult != DifficultLevel.None)
+            {
+                exams = exams.Where(e => e.Difficult == difficult);
+            }
             if (search != null)
             {
-                exams = exams.Where(e => (!string.IsNullOrEmpty(e.Title) && e.Title.ToLower().Contains(search.Trim().ToLower()) || (!string.IsNullOrEmpty(e.Detail)) && e.Detail.ToLower().Contains(search.Trim().ToLower()))).ToList();
+                exams = exams.Where(e => (!string.IsNullOrEmpty(e.Title) && e.Title.ToLower().Contains(search.Trim().ToLower()) || (!string.IsNullOrEmpty(e.Detail)) && e.Detail.ToLower().Contains(search.Trim().ToLower())));
             }
-            var examsDTO = _mapper.Map<List<ExamDTO>>(exams);
-            var returnValue = PagingList<ExamDTO>.OnCreate(examsDTO, pagination.CurrentPage, pagination.PageSize);
-            return returnValue.CreatePaginate();
+            if (purpose != ExamPurposes.None)
+            {
+                exams = exams.Where(e => e.Purpose == purpose && e.PublishStatus == PublishStatus.Published);
+            }
+            if (sort == "Hot")
+            {
+                exams = exams.OrderByDescending(orderBy => orderBy.AccessCount);
+            }
+            var pagingListExams = await PagingList<Exam>.OnCreateAsync(exams, pagination.CurrentPage, pagination.PageSize);
+            var result = pagingListExams.CreatePaginate();
+            var examsDTO = _mapper.Map<List<ExamDTO>>(result.Items);
+            foreach (var exam in examsDTO)
+            {
+                var temp = result.Items.Where(e => e.Id == exam.Id).FirstOrDefault();
+                exam.ForScript = temp.ScriptId != null ? true : false;
+                exam.Questions = _mapper.Map<List<QuestionDTO>>(await _context.ExamQuestions.Where(e => e.ExamId == exam.Id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).ToListAsync());
+            }
+            return new PaginateDTO<ExamDTO>
+            {
+                CurrentPage = pagination.CurrentPage,
+                PageSize = pagination.PageSize,
+                TotalItems = result.TotalItems,
+                Items = examsDTO,
+                TotalPages = result.TotalPages
+            };
         }
 
         public async Task<bool> CheckExist(Guid id)
@@ -197,10 +209,13 @@ namespace Application.Services.Core
             int rightAnswercount = 0;
             _exam ??= await _context.Exam.Where(e => e.Id == id).Include(inc => inc.Questions).ThenInclude(inc => inc.Question).ThenInclude(inc => inc.Answers).FirstOrDefaultAsync();
             var examAnswer = _mapper.Map<ExamAnswerDTO>(_exam);
+            var examHistory = await _context.ExamHistories.FirstOrDefaultAsync(eh => eh.ExamId == id && eh.AccountId == accountId && eh.IsDoing == true);
             foreach (var examQuestion in examAnswer.Questions)
             {
-                var answer = answers.FirstOrDefault(ans => ans.QuestionId == examQuestion.Id);
-                if (await _questionService.CheckAnswerAsync(examQuestion.Id, answer.Id))
+                var userAnswer = answers.FirstOrDefault(ans => ans.QuestionId == examQuestion.Id);
+                var answer = examQuestion.Answers.FirstOrDefault(ans => ans.Answer == userAnswer.Answer);
+                bool result = answer != null ? await _questionService.CheckAnswerAsync(examQuestion.Id, answer.Answer) : false;
+                if (result)
                 {
                     if (examQuestion.Type == Enum.GetName(typeof(QuestionType), QuestionType.Listening))
                     {
@@ -214,30 +229,65 @@ namespace Application.Services.Core
                 {
                     examQuestion.IsRightAnswer = false;
                 }
-                examQuestion.UserAnswer = answer.Answer;
+                examQuestion.UserAnswer = answer != null ? answer.Answer : "";
+                if (answer != null)
+                {
+                    examHistory.AccountAnswers.Add(new AccountAnswer
+                    {
+                        QuestionId = examQuestion.Id,
+                        AnswerId = answer.Id,
+                        Result = result
+                    });
+                }
             }
             int score = listening * 5 + reading * 5;
-            var examHistory = await _context.ExamHistories.FirstOrDefaultAsync(eh => eh.ExamId == id && eh.AccountId == accountId && eh.IsDoing == true);
+
             examHistory.IsDone = true;
             examHistory.IsDoing = false;
             examHistory.Score = score;
-            if (examHistory.Timestamp_pause != DateTime.MinValue)
-            {
-                examHistory.TotalTime += (int)DateTime.Now.Subtract(examHistory.Timestamp_pause).TotalMinutes;
-            }
-            else
-            {
-                examHistory.TotalTime = (int)DateTime.Now.Subtract(examHistory.Timestamp_start).TotalMinutes;
-            }
+            examHistory.Listening = listening;
+            examHistory.Reading = reading;
+            examHistory.TotalTime = (int)DateTime.Now.Subtract(examHistory.Timestamp_start).TotalMinutes;
+
             _exam.AccessCount += 1;
-            await _context.SaveChangesAsync();
-            return new ExamResultDTO
+            var examResultDto = new ExamResultDTO
             {
                 Score = score,
                 Listening = listening,
                 Reading = reading,
-                Answer = examAnswer
+                Answer = examAnswer,
+                Spent = examHistory.TotalTime,
+                Timestamp_start = examHistory.Timestamp_start,
+                Timestamp_end = examHistory.Timestamp_end,
+                Purpose = Enum.GetName(typeof(ExamPurposes), _exam.Purpose)
             };
+            if (_exam.ScriptId != null)
+            { //Check exam is belong to script
+                if (rightAnswercount >= Math.Round(_exam.Questions.Count * 0.8))
+                {
+                    var script = await _context.Scripts.Where(scr => scr.Id == _exam.ScriptId).Include(inc => inc.Certificate).FirstOrDefaultAsync();
+                    if (script.Certificate != null)
+                    {
+                        examResultDto.IsAbleToGetCertificate = true;
+                        examResultDto.IsCertificateExam = true;
+                    };
+
+                }
+                else
+                {
+                    examResultDto.IsAbleToGetCertificate = false;
+                }
+
+            }
+            if (await _context.SaveChangesAsync() > 0)
+            {
+                return examResultDto;
+            }
+            else
+            {
+                return null;
+            };
+
         }
 
         public async Task<bool> CheckConditionAsync(int accountId, Guid examId)
@@ -311,7 +361,7 @@ namespace Application.Services.Core
             return false;
         }
 
-        public async Task<List<ExamDTO>> GetExams(string search = null, bool questionSort = false, bool durationSort = false)
+        public async Task<List<ExamDTO>> GetExams(ExamPurposes purpose = ExamPurposes.None, string search = null, bool questionSort = false, bool durationSort = false)
         {
             var userExams = await _context.AccountExams.AsNoTracking().Select(sel => sel.ExamId).ToListAsync();
             var exams = await _context.Exam.Where(exam => !userExams.Any(ue => ue == exam.Id)).AsNoTracking().ToListAsync();
@@ -341,6 +391,147 @@ namespace Application.Services.Core
             var examDto = _mapper.Map<ExamDTO>(exam);
             examDto.Questions = _mapper.Map<List<QuestionDTO>>(await _context.ExamQuestions.Where(eq => eq.ExamId == id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).Select(sel => sel.Question).OrderBy(orderBy => orderBy.Toeic).ToListAsync());
             return examDto;
+        }
+
+        public async Task PublishAsync(Guid id, PublishStatus status)
+        {
+            _exam ??= await _context.Exam.FirstOrDefaultAsync(e => e.Id == id);
+            _exam.PublishStatus = status;
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<ExamAnalyzeDTO> GetExamAnalyzeAsync(Guid examId)
+        {
+            _exam = await _context.Exam.Where(e => e.Id == examId).Include(inc => inc.Questions).ThenInclude(inc => inc.Question).ThenInclude(inc => inc.Answers).FirstOrDefaultAsync();
+            ExamAnalyzeDTO examAnalyzeDTO = _mapper.Map<ExamAnalyzeDTO>(_exam);
+            var doneData = await _context.ExamHistories.Where(eh => eh.ExamId == examId).ToListAsync();
+            examAnalyzeDTO.DonePie = doneData.GroupBy(groupBy => groupBy.IsDone).ToDictionary(data => data.Key ? "Hoàn thành" : "Chưa hoàn thành", data => data.Count());
+            var gradeData = await _context.ExamHistories.Where(eh => eh.ExamId == examId && eh.IsDone).Include(inc => inc.AccountAnswers).ToListAsync();
+            examAnalyzeDTO.GradePie = gradeData.GroupBy(groupBy => groupBy.Score >= _exam.PassScore).ToDictionary(key => key.Key ? "Đạt" : "Chưa đạt", data => data.Count());
+            examAnalyzeDTO.ScorePie = new Dictionary<string, int>();
+            foreach (var grouped in gradeData.GroupBy(group => group.Score))
+            {
+                if (examAnalyzeDTO.ScorePie.ContainsKey(ScoreKey(grouped.Key)))
+                {
+                    examAnalyzeDTO.ScorePie[ScoreKey(grouped.Key)] = examAnalyzeDTO.ScorePie[ScoreKey(grouped.Key)] + 1;
+                }
+                else
+                {
+                    examAnalyzeDTO.ScorePie[ScoreKey(grouped.Key)] = 1;
+                }
+            }
+            foreach (var question in examAnalyzeDTO.Questions)
+            {
+                foreach (var answer in question.Answers)
+                {
+                    answer.SelectCount = gradeData.Count(count => count.AccountAnswers.FirstOrDefault(ans => ans.AnswerId == answer.Id) != null);
+                }
+            }
+            return examAnalyzeDTO;
+        }
+        public string ScoreKey(int key)
+        {
+            if (key > 900)
+            {
+                return "> 900";
+            };
+            if (key > 800)
+            {
+                return "800 ~ 900";
+            }
+            if (key > 700)
+            {
+                return "700 ~ 800";
+            }
+            if (key > 600)
+            {
+                return "600 ~ 700";
+            }
+            if (key > 500)
+            {
+                return "500 ~ 600";
+            }
+            if (key > 400)
+            {
+                return "400 ~ 500";
+            }
+            if (key > 300)
+            {
+                return "300 ~ 400";
+            }
+            if (key > 200)
+            {
+                return "200 ~ 300";
+            }
+            if (key > 100)
+            {
+                return "100 ~ 200";
+            }
+            return "< 100";
+        }
+
+        public async Task<bool> CreateExamQuestionAsync(Guid id, QuestionCreateDTO questionCreate)
+        {
+            _exam = await _context.Exam.Where(e => e.Id == id).Include(inc => inc.Questions).FirstOrDefaultAsync();
+            var newQuestion = await _questionService.CreateQuestionAsync(questionCreate);
+            if (newQuestion != null)
+            {
+                _exam.Questions.Add(new ExamQuestion
+                {
+                    Question = newQuestion
+                });
+                if (await _context.SaveChangesAsync() > 0)
+                {
+                    return true;
+                }
+                return false;
+            }
+            return false;
+        }
+
+        public async Task<bool> GenerateQuestionAsync()
+        {
+            var exams = await _context.Exam.Include(inc => inc.Questions).ThenInclude(inc => inc.Question).ThenInclude(inc => inc.Answers).ToListAsync();
+            var toeicQuestions = await _context.Questions.Where(q => q.Type == QuestionType.Toeic).ToListAsync();
+            foreach (var exam in exams)
+            {
+                foreach (var question in toeicQuestions)
+                {
+                    if (!exam.Questions.Any(q => q.Question.Id == question.Id) && exam.Questions.Count < 200)
+                    {
+                        exam.Questions.Add(new ExamQuestion
+                        {
+                            Question = question
+                        });
+                        if (question.Toeic < ToeicPart.Part5)
+                        {
+                            exam.TotalListening += 1;
+                        }
+                        else
+                        {
+                            exam.TotalReading += 1;
+                        }
+                        exam.TotalScore += 5;
+                        exam.PassScore += 5;
+                        exam.Duration += 1;
+                        question.Status = QuestionStatus.InUse;
+                    }
+                }
+            }
+            if (await _context.SaveChangesAsync() > 0)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<bool> GenerateHistoryAsync(int accountId)
+        {
+            // var examHistory = await _context.ExamHistories.Where(eh => eh.AccountId == accountId).Include(inc => inc.Exam).ThenInclude(inc => inc.Questions).ThenInclude(inc => inc.Question).ThenInclude(inc => inc.Answers).ToListAsync();
+            // foreach(var history in examHistory){
+            //     var accountAnswer = await _context.AccountAnswers.Where(ac => ac.ExamHistoryId == history.Id).
+            // }
+            return true;
         }
     }
 }

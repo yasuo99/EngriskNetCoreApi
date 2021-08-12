@@ -4,10 +4,12 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Application.DTOs.Example;
 using Application.DTOs.Memory;
 using Application.DTOs.Pagination;
 using Application.DTOs.Question;
 using Application.DTOs.Word;
+using Application.DTOs.Word.WordCategory;
 using Application.Helper;
 using Application.Services.Core.Abstraction;
 using Application.Utilities;
@@ -75,16 +77,17 @@ namespace Application.Services.Core
             var word = _mapper.Map<Word>(wordCreateDTO);
             PreProcess(word);
             word.Eng = word.Eng.FirstLetterUppercase();
+            word.Vie = word.Vie.FirstLetterUppercase();
             if (wordCreateDTO.Image != null)
             {
                 word.WordImg = _fileService.UploadFile(wordCreateDTO.Image, SD.ImagePath);
             }
             word.WordVoice = await _fileService.GetAudioFromWord(word.Eng, wordCreateDTO.EngVoice);
             _context.Add(word);
+            await _questionService.CreateVocabularyPracticeQuestion(word);
             if (await _context.SaveChangesAsync() > 0)
             {
                 var returnWord = _mapper.Map<WordDTO>(word);
-                await _notificationService.SendSignalRResponse("NewWord", returnWord);
                 return returnWord;
             }
             return null;
@@ -153,8 +156,9 @@ namespace Application.Services.Core
 
         public async Task DeleteWordAsync(Guid id)
         {
-            var word = await _context.Word.FirstOrDefaultAsync(w => w.Id == id);
+            var word = await _context.Word.Where(w => w.Id == id).Include(inc => inc.Questions).ThenInclude(inc => inc.Question).FirstOrDefaultAsync();
             _context.Remove(word);
+            _context.RemoveRange(word.Questions.Select(sel => sel.Question));
             if (await _context.SaveChangesAsync() > 0)
             {
                 await _notificationService.SendSignalRResponse("DeleteWord", id);
@@ -178,13 +182,26 @@ namespace Application.Services.Core
 
         public async Task<PaginateDTO<WordDTO>> GetAllAsync(PaginationDTO pagination, string search = null)
         {
-            var returnWords = _mapper.Map<List<WordDTO>>(await _context.Word.Where(w => w.Type == VocabularyType.Insert).Include(inc => inc.Categories).ThenInclude(inc => inc.WordCategory).OrderByDescending(orderBy => orderBy.CreatedDate).AsNoTracking().ToListAsync());
+            var words = from w in _context.Word.Where(word => word.Type == VocabularyType.Insert).OrderByDescending(orderBy => orderBy.UpdatedDate).OrderByDescending(orderBy => orderBy.CreatedDate).AsNoTracking() select w;
             if (search != null)
             {
-                returnWords = returnWords.Where(w => (!string.IsNullOrEmpty(w.Eng) && w.Eng.ToLower().Contains(search.ToLower())) || (!string.IsNullOrEmpty(w.Vie) && w.Vie.ToLower().Contains(search.ToLower()))).ToList();
+                words = words.Where(w => (!string.IsNullOrEmpty(w.Eng) && w.Eng.ToLower().Contains(search.ToLower())) || (!string.IsNullOrEmpty(w.Vie) && w.Vie.ToLower().Contains(search.ToLower())));
             }
-            var paginateWords = PagingList<WordDTO>.OnCreate(returnWords, pagination.CurrentPage, pagination.PageSize);
-            return paginateWords.CreatePaginate();
+            var paginateWords = await PagingList<Word>.OnCreateAsync(words, pagination.CurrentPage, pagination.PageSize);
+            var result = paginateWords.CreatePaginate();
+            var wordsDto = _mapper.Map<List<WordDTO>>(result.Items);
+            foreach (var word in wordsDto)
+            {
+                word.Categories = _mapper.Map<List<WordCategoryDTO>>(await _context.Categories.Where(cate => cate.WordId == word.Id).Include(inc => inc.WordCategory).Select(sel => sel.WordCategory).AsNoTracking().ToListAsync());
+            }
+            return new PaginateDTO<WordDTO>
+            {
+                CurrentPage = pagination.CurrentPage,
+                PageSize = pagination.PageSize,
+                Items = wordsDto,
+                TotalPages = result.TotalPages,
+                TotalItems = result.TotalItems
+            };
         }
 
         public async Task<WordDTO> GetWordAsync(Guid id)
@@ -312,7 +329,7 @@ namespace Application.Services.Core
 
         public async Task<Word> UpdateAsync(Guid id, WordUpdateDTO wordUpdateDTO)
         {
-            var word = await _context.Word.Where(w => w.Id == id).Include(inc => inc.Categories).Include(inc => inc.Examples).FirstOrDefaultAsync();
+            var word = await _context.Word.Where(w => w.Id == id).Include(inc => inc.Categories).Include(inc => inc.Examples).Include(inc => inc.Questions).FirstOrDefaultAsync();
             _mapper.Map(wordUpdateDTO, word);
             word.Eng = word.Eng.FirstLetterUppercase();
             word.Vie = word.Vie.FirstLetterUppercase();
@@ -324,7 +341,7 @@ namespace Application.Services.Core
                 }
                 word.WordImg = _fileService.UploadFile(wordUpdateDTO.Image, SD.ImagePath);
             }
-            if (!wordUpdateDTO.Eng.ToLower().Equals(word.Eng.ToLower()))
+            if (!string.IsNullOrEmpty(wordUpdateDTO.Eng) && !wordUpdateDTO.Eng.ToLower().Equals(word.Eng.ToLower()))
             {
                 if (!string.IsNullOrEmpty(word.WordVoice))
                 {
@@ -432,6 +449,84 @@ namespace Application.Services.Core
         public async Task<bool> AddWordQuestionAsync(Guid id, List<QuestionDTO> questions)
         {
             throw new NotImplementedException();
+        }
+
+        public async Task PublishAsync(Guid id, PublishStatus status)
+        {
+            var word = await _context.Word.FirstOrDefaultAsync(w => w.Id == id);
+            word.PublishStatus = status;
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<PaginateDTO<QuestionDTO>> GetWordPracticeQuestionAsync(Guid wordId, PaginationDTO pagination, QuestionType type = QuestionType.None, string search = null)
+        {
+            var questions = await _context.WordQuestions.Where(wq => wq.WordId == wordId).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).Select(sel => sel.Question).ToListAsync();
+            if (type != QuestionType.None)
+            {
+                questions = questions.Where(q => q.Type == type).ToList();
+            }
+            if (search != null)
+            {
+                questions = questions.Where(q => !string.IsNullOrEmpty(q.Content) && q.Content.Contains(search.Trim()) || !string.IsNullOrEmpty(q.PreQuestion) && q.PreQuestion.Contains(search.Trim())).ToList();
+            }
+            var questionsDto = _mapper.Map<List<QuestionDTO>>(questions);
+            var paginlistQuestionDto = PagingList<QuestionDTO>.OnCreate(questionsDto, pagination.CurrentPage, pagination.PageSize);
+            return paginlistQuestionDto.CreatePaginate();
+        }
+
+        public async Task<bool> CreateWordExample(Guid id, ExampleDTO exampleDTO)
+        {
+            var example = _mapper.Map<Example>(exampleDTO);
+            example.VerifiedStatus = Status.Approved;
+            example.Eng = example.Eng.FirstLetterUppercase();
+            example.Vie = example.Vie.FirstLetterUppercase();
+            var word = await _context.Word.Where(word => word.Id == id).Include(inc => inc.Examples).FirstOrDefaultAsync();
+            word.Examples.Add(example);
+            await _questionService.CreateVocabularyPracticeQuestion(word, example);
+            if (await _context.SaveChangesAsync() > 0)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public Task<bool> DeleteWordExamole(Guid id, List<Guid> examples)
+        {
+            throw new NotImplementedException();
+        }
+
+        public async Task<bool> GenerateWordQuestionAsync()
+        {
+            var words = await _context.Word.Where(w => w.Type == VocabularyType.Insert).Include(inc => inc.Questions).ThenInclude(inc => inc.Question).ToListAsync();
+            foreach (var word in words)
+            {
+
+                await _questionService.FillVocabularyPracticeQuestion(word);
+            }
+            if (await _context.SaveChangesAsync() > 0)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<bool> DeleteFailQuestionAsync()
+        {
+             var words = await _context.Word.Where(w => w.Type == VocabularyType.Insert).Include(inc => inc.Questions).ThenInclude(inc => inc.Question).ThenInclude(inc => inc.Answers).ToListAsync();
+            foreach (var word in words)
+            {
+
+               foreach(var q in word.Questions){
+                   if(q.Question.Answers.Any(ans => string.IsNullOrEmpty(ans.Content))){
+                       _context.Questions.Remove(q.Question);
+                   }
+               }
+            }
+            if (await _context.SaveChangesAsync() > 0)
+            {
+                return true;
+            }
+            return false;
         }
     }
 }

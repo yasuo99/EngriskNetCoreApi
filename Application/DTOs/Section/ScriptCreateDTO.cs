@@ -19,6 +19,7 @@ namespace Application.DTOs.Section
         public List<WordDTO> Words { get; set; }
         public string Theory { get; set; }
         public Guid Exam { get; set; }
+        public Guid CertificateId { get; set; }
         public int VocabularySetting { get; set; }
         public ScriptTypes Type { get; set; }
     }

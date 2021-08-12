@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Application.DTOs.Account.Route;
 using Application.DTOs.Pagination;
 using Application.DTOs.Question;
 using Application.DTOs.Quiz;
@@ -30,6 +31,8 @@ namespace Application.Services.Core
         private Section _anonymousSection;
         private AnonymousSettings _anonymousSettings;
         private IFileService _fileService;
+        private IQuestionService _questionService;
+        private INotificationService _notificationService;
         public Section AnonymousSection
         {
             get
@@ -38,7 +41,7 @@ namespace Application.Services.Core
             }
         }
         private Section _section;
-        public SectionService(ApplicationDbContext context, IMapper mapper, IQuizService quizService, IOptions<AnonymousSettings> anonymousSettings, IFileService fileService)
+        public SectionService(ApplicationDbContext context, IMapper mapper, IQuizService quizService, IOptions<AnonymousSettings> anonymousSettings, IFileService fileService, IQuestionService questionService, INotificationService notificationService)
         {
             _context = context;
             _mapper = mapper;
@@ -50,6 +53,8 @@ namespace Application.Services.Core
                 ConversationQuestionConfig = anonymousSettings.Value.ConversationQuestionConfig
             };
             _fileService = fileService;
+            _questionService = questionService;
+            _notificationService = notificationService;
         }
         public async Task<bool> CheckExistAsync(Guid sectionId)
         {
@@ -378,7 +383,7 @@ namespace Application.Services.Core
         {
             var userSections = await _context.AccountSections.AsNoTracking().ToListAsync();
             var userSectionsId = userSections.Select(sel => sel.SectionId).ToList();
-            var sections = await _context.Sections.Where(section => !userSectionsId.Any(id => id == section.Id) && section.RouteId == null).ToListAsync();
+            var sections = await _context.Sections.Where(section => !userSectionsId.Any(id => id == section.Id) && section.RouteId == null && section.PublishStatus == PublishStatus.Published).ToListAsync();
             return _mapper.Map<List<SectionDTO>>(sections);
         }
 
@@ -431,15 +436,28 @@ namespace Application.Services.Core
 
         public async Task<PaginateDTO<SectionDTO>> GetManageSectionsAsync(PaginationDTO pagination, string search = null)
         {
-            var usersSections = await _context.AccountSections.AsNoTracking().Select(sel => sel.SectionId).ToListAsync();
-            var engriskSections = await _context.Sections.Where(sec => !usersSections.Any(us => us == sec.Id)).Include(inc => inc.Route).AsNoTracking().OrderByDescending(orderBy => orderBy.CreatedDate).ToListAsync();
+            var sections = from s in _context.Sections.OrderByDescending(orderBy => orderBy.UpdatedDate).OrderByDescending(orderBy => orderBy.CreatedDate).AsNoTracking() select s;
             if (search != null)
             {
-                engriskSections = engriskSections.Where(sec => (!string.IsNullOrEmpty(sec.SectionName) && sec.SectionName.ToLower().Contains(search.ToLower())) || (!string.IsNullOrEmpty(sec.Description) && sec.Description.ToLower().Contains(search.ToLower()))).ToList();
+                sections = sections.Where(sec => (!string.IsNullOrEmpty(sec.SectionName) && sec.SectionName.ToLower().Contains(search.ToLower())) || (!string.IsNullOrEmpty(sec.Description) && sec.Description.ToLower().Contains(search.ToLower())));
             }
-            var engriskSectionsDto = _mapper.Map<List<SectionDTO>>(engriskSections);
-            var pagingListEngriskSections = PagingList<SectionDTO>.OnCreate(engriskSectionsDto, pagination.CurrentPage, pagination.PageSize);
-            return pagingListEngriskSections.CreatePaginate();
+
+            var pagingListEngriskSections = await PagingList<Section>.OnCreateAsync(sections, pagination.CurrentPage, pagination.PageSize);
+            var result = pagingListEngriskSections.CreatePaginate();
+            var engriskSectionsDto = _mapper.Map<List<SectionDTO>>(result.Items);
+            foreach (var sec in engriskSectionsDto)
+            {
+                sec.Route = _mapper.Map<RouteDTO>(await _context.Routes.FirstOrDefaultAsync(route => route.Id == sec.RouteId));
+                sec.TotalScript = await _context.Scripts.Where(script => script.SectionId == sec.Id).CountAsync();
+            }
+            return new PaginateDTO<SectionDTO>
+            {
+                CurrentPage = pagination.CurrentPage,
+                PageSize = pagination.PageSize,
+                Items = engriskSectionsDto,
+                TotalItems = result.TotalItems,
+                TotalPages = result.TotalPages
+            };
         }
 
         public async Task<bool> DeleteSectionAsync(Guid id)
@@ -538,6 +556,7 @@ namespace Application.Services.Core
                 script.Questions = await _context.ScriptQuestions.Where(sq => sq.ScriptId == script.Id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).ToListAsync();
                 script.Words = await _context.ScriptWords.Where(sw => sw.ScriptId == script.Id).Include(inc => inc.Word).ToListAsync();
                 script.MiniExam = await _context.Exam.Where(exam => exam.ScriptId == script.Id).Include(inc => inc.Questions).ThenInclude(inc => inc.Question).ThenInclude(inc => inc.Answers).AsNoTracking().FirstOrDefaultAsync();
+                script.Certificate = await _context.Certificates.Where(cer => cer.ScriptId == script.Id).FirstOrDefaultAsync();
             }
             return _mapper.Map<SectionScriptDTO>(_section);
         }
@@ -571,7 +590,7 @@ namespace Application.Services.Core
         }
         public async Task<ScriptLearnDTO> ScriptLearnAsync(Guid id, int accountId)
         {
-            var script = await _context.Scripts.Where(script => script.Id == id).FirstOrDefaultAsync();
+            var script = await _context.Scripts.Where(script => script.Id == id).Include(inc => inc.MiniExam).AsNoTracking().FirstOrDefaultAsync();
             //Kiểm tra xem đã có lưu lại tiến trình học cho section này chưa
             var sectionProgress = await _context.SectionProgresses.Where(sp => sp.AccountId == accountId && sp.SectionId == script.SectionId).Include(inc => inc.Details).FirstOrDefaultAsync();
             if (sectionProgress == null)//Chưa lưu lại lịch sử cho section có script này
@@ -602,16 +621,20 @@ namespace Application.Services.Core
                 }
             }
             var scriptLearnDto = _mapper.Map<ScriptLearnDTO>(script);
-            var words = await _context.ScriptWords.Where(sw => sw.ScriptId == id).Include(inc => inc.Word).ThenInclude(inc => inc.Families).Include(inc => inc.Word).ThenInclude(inc => inc.Examples).ToListAsync();
+            var words = await _context.ScriptWords.Where(sw => sw.ScriptId == id).Include(inc => inc.Word).ThenInclude(inc => inc.Families).Include(inc => inc.Word).ThenInclude(inc => inc.Examples).AsNoTracking().ToListAsync();
             scriptLearnDto.Words = _mapper.Map<List<WordDTO>>(words);
             foreach (var word in scriptLearnDto.Words)
             {
-                var wordPracticeQuestions = await _context.WordQuestions.Where(wq => wq.WordId == word.Id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).Select(sel => sel.Question).ToListAsync();
+                var wordPracticeQuestions = await _context.WordQuestions.Where(wq => wq.WordId == word.Id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).Select(sel => sel.Question).AsNoTracking().ToListAsync();
                 //Add vocabulary practice questions first
-                scriptLearnDto.Questions.AddRange(_mapper.Map<List<QuestionDTO>>(wordPracticeQuestions.GetAmountRandomFromAList(script.VocabularySetting)));
+                scriptLearnDto.Questions.AddRange(_mapper.Map<List<QuestionDTO>>(wordPracticeQuestions.GetAmountRandomFromAList(2)));
             }
 
-            scriptLearnDto.Questions.AddRange(_mapper.Map<List<QuestionDTO>>(await _context.ScriptQuestions.Where(sq => sq.ScriptId == id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).Select(sel => sel.Question).ToListAsync()));
+            scriptLearnDto.Questions.AddRange(_mapper.Map<List<QuestionDTO>>(await _context.ScriptQuestions.Where(sq => sq.ScriptId == id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).Select(sel => sel.Question).AsNoTracking().ToListAsync()));
+            if (script.MiniExam != null)
+            {
+                scriptLearnDto.Questions.AddRange(_mapper.Map<List<QuestionDTO>>(await _context.ExamQuestions.Where(eq => eq.ExamId == script.MiniExam.Id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).Select(sel => sel.Question).AsNoTracking().ToListAsync()));
+            }
             await _context.SaveChangesAsync();
             return scriptLearnDto;
         }
@@ -650,6 +673,10 @@ namespace Application.Services.Core
 
         public async Task<bool> CheckPreviousSectionDoneAsync(Guid id, int accountId)
         {
+            var section = await _context.Sections.FirstOrDefaultAsync(sec => sec.Id == id);
+            if(section.Index == 0){
+                return true;
+            }
             var sectionProgress = await _context.SectionProgresses.Where(sp => sp.SectionId == id && sp.AccountId == accountId).Include(inc => inc.Section).FirstOrDefaultAsync();
             var previousSectionProgress = await _context.SectionProgresses.Where(sp => sp.Section.Index == sectionProgress.Section.Index - 1 && sp.AccountId == accountId).FirstOrDefaultAsync();
             if (previousSectionProgress == null)
@@ -670,11 +697,11 @@ namespace Application.Services.Core
         {
             var script = await _context.Scripts.Where(script => script.Id == id).FirstOrDefaultAsync();
             var scriptLearnDto = _mapper.Map<ScriptLearnDTO>(script);
-            scriptLearnDto.Words = _mapper.Map<List<WordDTO>>(await _context.ScriptWords.Where(sw => sw.ScriptId == id).Include(inc => inc.Word).ThenInclude(inc => inc.Families).ToListAsync());
+            scriptLearnDto.Words = _mapper.Map<List<WordDTO>>(await _context.ScriptWords.Where(sw => sw.ScriptId == id).Include(inc => inc.Word).ThenInclude(inc => inc.Families).Include(inc => inc.Word).ThenInclude(inc => inc.Examples).ToListAsync());
             foreach (var word in scriptLearnDto.Words)
             {
                 var wordPracticeQuestions = await _context.WordQuestions.Where(wq => wq.WordId == word.Id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).Select(sel => sel.Question).ToListAsync();
-                scriptLearnDto.Questions.AddRange(_mapper.Map<List<QuestionDTO>>(wordPracticeQuestions.GetAmountRandomFromAList(script.VocabularySetting)));
+                scriptLearnDto.Questions.AddRange(_mapper.Map<List<QuestionDTO>>(wordPracticeQuestions.GetAmountRandomFromAList(2)));
             }
             scriptLearnDto.Questions.AddRange(_mapper.Map<List<QuestionDTO>>(await _context.ScriptQuestions.Where(sq => sq.ScriptId == id).Include(inc => inc.Question).ThenInclude(inc => inc.Answers).Select(sel => sel.Question).ToListAsync()));
             return scriptLearnDto;
@@ -682,28 +709,57 @@ namespace Application.Services.Core
 
         public async Task<bool> CreateSectionScriptAsync(Guid sectionId, List<ScriptCreateDTO> scripts)
         {
-            _section = await _context.Sections.Where(section => section.Id == sectionId).Include(inc => inc.Scripts).ThenInclude(inc => inc.Words).Include(inc => inc.Scripts).ThenInclude(inc => inc.Questions).Include(inc => inc.Scripts).ThenInclude(inc => inc.MiniExam).FirstOrDefaultAsync();
+            _section = await _context.Sections.Where(section => section.Id == sectionId).Include(inc => inc.Scripts).ThenInclude(inc => inc.Words).Include(inc => inc.Scripts).ThenInclude(inc => inc.Questions).Include(inc => inc.Scripts).ThenInclude(inc => inc.MiniExam).Include(inc => inc.Scripts).ThenInclude(inc => inc.Certificate).FirstOrDefaultAsync();
             foreach (var script in scripts)
             {
                 if (Guid.Empty != script.Id && _section.Scripts.Any(s => s.Id == script.Id))
                 {
                     var currentScript = _section.Scripts.FirstOrDefault(s => s.Id == script.Id);
-                    if (!string.IsNullOrEmpty(script.Theory) || script.Words.Count > 0 || script.Questions.Count > 0 || script.Exam != Guid.Empty)
+                    if (!string.IsNullOrEmpty(script.Theory) || script.Words.Count > 0 || script.Questions.Count > 0)
                     {
                         if (script.Exam != Guid.Empty)
                         {
                             if (currentScript.MiniExam.Id != script.Exam)
                             {
                                 currentScript.MiniExam.ScriptId = null;
+                                currentScript.MiniExam.Purpose = ExamPurposes.Test;
                                 var exam = await _context.Exam.FirstOrDefaultAsync(e => e.Id == script.Exam);
                                 exam.ScriptId = script.Id;
+                                if (script.CertificateId != Guid.Empty)
+                                {
+                                    exam.Purpose = ExamPurposes.Certificate;
+                                }
+                                else
+                                {
+                                    exam.Purpose = ExamPurposes.Learn;
+                                }
                             };
                         }
+                        if (script.CertificateId != Guid.Empty)
+                        {
+                            if (currentScript.Certificate.Id != script.CertificateId)
+                            {
+                                currentScript.Certificate.ScriptId = null;
+                                var certificate = await _context.Certificates.FirstOrDefaultAsync(e => e.Id == script.CertificateId);
+                                certificate.ScriptId = script.Id;
+                            };
+                        }
+                        var newQuestions = script.Questions.Where(q => !currentScript.Questions.Any(question => question.QuestionId == q.Id)).Select(sel => sel.Id).ToList();
+                        var removeQuestions = currentScript.Questions.Where(q => !script.Questions.Any(question => question.Id == q.QuestionId)).Select(sel => sel.QuestionId).ToList();
+                        await _questionService.ChangeStatusAsync(newQuestions);
+                        await _questionService.ChangeStatusAsync(removeQuestions);
                         _mapper.Map(script, currentScript);
                     }
                     else
                     {
+                        if (currentScript.MiniExam != null)
+                        {
+                            currentScript.MiniExam.Purpose = ExamPurposes.Test;
+                        }
+                        var removeQuestions = currentScript.Questions.Select(sel => sel.QuestionId).ToList();
+                        await _questionService.ChangeStatusAsync(removeQuestions);
                         _section.Scripts.Remove(currentScript);
+
                     }
                 }
                 else
@@ -726,7 +782,7 @@ namespace Application.Services.Core
                             case ScriptTypes.Reading:
                                 newScript.Index = 3;
                                 break;
-                            case ScriptTypes.Writing:
+                            case ScriptTypes.Speaking:
                                 newScript.Index = 4;
                                 break;
                             case ScriptTypes.Conversation:
@@ -738,13 +794,19 @@ namespace Application.Services.Core
                             default:
                                 break;
                         }
-                        if (!string.IsNullOrEmpty(newScript.Theory) || newScript.Questions.Count > 0 || newScript.Words.Count > 0 || script.Exam != Guid.Empty)
+                        if (!string.IsNullOrEmpty(newScript.Theory) || newScript.Questions.Count > 0 || newScript.Words.Count > 0 || script.Exam != Guid.Empty || script.CertificateId != Guid.Empty)
                         {
+                            await _questionService.ChangeStatusAsync(newScript.Questions.Select(sel => sel.QuestionId).ToList());
                             _section.Scripts.Add(newScript);
                             if (script.Exam != Guid.Empty)
                             {
                                 var exam = await _context.Exam.Where(e => e.Id == script.Exam).Include(inc => inc.Script).FirstOrDefaultAsync();
                                 exam.Script = newScript;
+                            }
+                            if (script.CertificateId != Guid.Empty)
+                            {
+                                var certificate = await _context.Certificates.Where(e => e.Id == script.CertificateId).Include(inc => inc.Script).FirstOrDefaultAsync();
+                                certificate.Script = newScript;
                             }
 
                         }
@@ -757,6 +819,19 @@ namespace Application.Services.Core
                 return true;
             }
             return false;
+        }
+
+        public async Task PublishAsync(Guid id, PublishStatus status)
+        {
+            _section ??= await _context.Sections.FirstOrDefaultAsync(sec => sec.Id == id);
+            _section.PublishStatus = status;
+            if(status == PublishStatus.UnPublished){
+                _section.Route = null;
+            }
+            if (await _context.SaveChangesAsync() > 0)
+            {
+                await _notificationService.SendSignalRResponse("Refresh", "");
+            }
         }
     }
 }

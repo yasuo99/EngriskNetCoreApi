@@ -18,6 +18,8 @@ using Application.Services.Core.Abstraction;
 using Application.Utilities;
 using System.Linq.Expressions;
 using Application.Services;
+using System.Threading;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.Helper
 {
@@ -284,6 +286,34 @@ namespace Application.Helper
                 datetimes.Add(start.Date.AddDays(i));
             }
             return datetimes;
+        }
+        public static async Task<PaginateDTO<TModel>> PaginateAsync<TModel>(
+            this IQueryable<TModel> query,
+            int page,
+            int limit,
+            CancellationToken cancellationToken)
+            where TModel : class
+        {
+
+            var paged = new PaginateDTO<TModel>();
+
+            page = (page < 0) ? 1 : page;
+
+            paged.CurrentPage = page;
+            paged.PageSize = limit;
+
+            var totalItemsCountTask = await query.CountAsync(cancellationToken);
+
+            var startRow = (page - 1) * limit;
+            paged.Items = await query
+                       .Skip(startRow)
+                       .Take(limit)
+                       .ToListAsync(cancellationToken);
+
+            paged.TotalItems =  totalItemsCountTask;
+            paged.TotalPages = (int)Math.Ceiling(paged.TotalItems / (double)limit);
+
+            return paged;
         }
     }
 }

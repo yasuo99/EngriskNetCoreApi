@@ -23,24 +23,35 @@ namespace Application.Services.Core
         {
             _context = context;
         }
-
-        public Task<bool> CreateCategoryTagAsync(CategoryTag categoryTag)
+        public async Task<bool> CheckExistAsync(Guid id){
+            return await _context.CategoryTags.AnyAsync(tag => tag.Id == id);
+        }
+        public async Task<bool> CreateCategoryTagAsync(CategoryTag categoryTag)
         {
-            throw new System.NotImplementedException();
+            _context.Add(categoryTag);
+            if(await _context.SaveChangesAsync() > 0){
+                return true;
+            }
+            return false;
         }
 
-        public Task<bool> DeleteCategoryTagAsync(Guid id)
+        public async Task<bool> DeleteCategoryTagAsync(Guid id)
         {
-            throw new NotImplementedException();
+            var tag = await _context.CategoryTags.FirstOrDefaultAsync(tag => tag.Id == id);
+            _context.Remove(tag);
+            if(await _context.SaveChangesAsync() > 0){
+                return true;
+            }
+            return false;
         }
 
         public async Task<PaginateDTO<CategoryTag>> GetAllCategoryTagAsync(PaginationDTO pagination, string search = null)
         {
-            var categoryTags = await _context.CategoryTags.AsNoTracking().ToListAsync();
+            var categoryTags = from ct in _context.CategoryTags.OrderByDescending(orderBy => orderBy.UpdatedDate).OrderByDescending(orderBy => orderBy.CreatedDate).AsNoTracking() select ct;
             if(search != null){
-                categoryTags = categoryTags.Where(ct => ct.Tag.ToLower().Contains(search.Trim().ToLower())).ToList();
+                categoryTags = categoryTags.Where(ct => ct.Tag.ToLower().Contains(search.Trim().ToLower()));
             }
-            var pagingListTags = PagingList<CategoryTag>.OnCreate(categoryTags, pagination.CurrentPage,pagination.PageSize);
+            var pagingListTags = await PagingList<CategoryTag>.OnCreateAsync(categoryTags, pagination.CurrentPage,pagination.PageSize);
             return pagingListTags.CreatePaginate();
         }
 
@@ -50,9 +61,14 @@ namespace Application.Services.Core
             return tags;
         }
 
-        public Task<bool> UpdateCategoryTagAsync(Guid id, CategoryTag categoryTag)
+        public async Task<bool> UpdateCategoryTagAsync(Guid id, CategoryTag categoryTag)
         {
-            throw new NotImplementedException();
+            var tag = await _context.CategoryTags.FirstOrDefaultAsync(tag => tag.Id == id);
+            tag.Tag = categoryTag.Tag;
+            if(await _context.SaveChangesAsync() > 0){
+                return true;
+            }
+            return false;
         }
     }
 }

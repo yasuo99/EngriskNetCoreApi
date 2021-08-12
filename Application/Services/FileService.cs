@@ -37,11 +37,7 @@ namespace Application.Services
         public void DeleteFile(string saveLocation)
         {
             Uri uri = new Uri(saveLocation);
-            var location = HttpUtility.ParseQueryString(uri.Query).Get("image");
-            if(string.IsNullOrEmpty(location)){
-                location = HttpUtility.ParseQueryString(uri.Query).Get("audio");
-            }
-            var filepath = Path.Combine(contentRootPath, location);
+            var filepath = Path.Combine(contentRootPath, uri.AbsolutePath);
             System.IO.File.Delete(filepath);
         }
         public async Task<string> GetAudioFromWord(string word, string voice)
@@ -96,16 +92,23 @@ namespace Application.Services
             {
                 return Path.Combine(GetAppBaseUrl(Path.Combine(saveLocation, file.FileName), "image"));
             }
-              return Path.Combine(GetAppBaseUrl(Path.Combine(saveLocation, file.FileName), "audio"));
+            return Path.Combine(GetAppBaseUrl(Path.Combine(saveLocation, file.FileName), "audio"));
         }
         public string GetAppBaseUrl(string saveLocation, string type)
         {
-            if (type.Equals("image"))
-            {
-                return string.Format("{0}://{1}/{2}{3}{4}", _httpContext.HttpContext.Request.Scheme, _httpContext.HttpContext.Request.Host, _httpContext.HttpContext.Request.PathBase, "api/v2/streaming/image?image=", saveLocation);
 
-            }
-            return string.Format("{0}://{1}/{2}{3}{4}", _httpContext.HttpContext.Request.Scheme, _httpContext.HttpContext.Request.Host, _httpContext.HttpContext.Request.PathBase, "api/v2/streaming/audio?audio=", saveLocation);
+            return string.Format("{0}://{1}/{2}{3}", _httpContext.HttpContext.Request.Scheme, _httpContext.HttpContext.Request.Host, _httpContext.HttpContext.Request.PathBase, saveLocation);
+        }
+        public string GetStreamBaseUrl(string saveLocation, string type)
+        {
+
+            return string.Format("{0}://{1}/{2}/{3}{4}", _httpContext.HttpContext.Request.Scheme, _httpContext.HttpContext.Request.Host, _httpContext.HttpContext.Request.PathBase, "api/v2/streaming/audio?audio=",saveLocation);
+        }
+        public string GetImageFileName(string path)
+        {
+            Uri uri = new Uri(GetAppBaseUrl(path, "image"));
+            var location = HttpUtility.ParseQueryString(uri.Query).Get("image");
+            return location;
         }
     }
 }

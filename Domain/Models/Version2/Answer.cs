@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using Domain.Models;
 using Domain.Models.BaseModel.Generic;
@@ -16,5 +17,6 @@ namespace Domain.Models.Version2
         public string ImageFileName { get; set; }
         public string AudioFileName { get; set; }
         public bool IsQuestionAnswer { get; set; }
+        public virtual ICollection<AccountAnswer> AccountAnswers { get; set; }
     }
 }

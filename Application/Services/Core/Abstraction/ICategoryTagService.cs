@@ -8,6 +8,7 @@ namespace Application.Services.Core.Abstraction
 {
     public interface ICategoryTagService
     {
+        Task<bool> CheckExistAsync(Guid id);
         Task<List<CategoryTag>> GetAllCategoryTagAsync();
         Task<PaginateDTO<CategoryTag>> GetAllCategoryTagAsync(PaginationDTO pagination, string search = null);
         Task<bool> CreateCategoryTagAsync(CategoryTag categoryTag);

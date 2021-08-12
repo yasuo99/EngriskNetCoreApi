@@ -128,21 +128,6 @@ namespace Engrisk.Controllers.V1
             }
             return Ok(returnGroups);
         }
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateGroup(Guid id, Group group)
-        {
-            var groupFromdb = await _repo.GetAll<Group>(group => group.Id == id);
-            if (groupFromdb == null)
-            {
-                return NotFound();
-            }
-            _mapper.Map(group, groupFromdb);
-            if (await _repo.SaveAll())
-            {
-                return Ok();
-            }
-            return StatusCode(500);
-        }
         [HttpPut("{groupId}/words/add")]
         public async Task<IActionResult> AddWordToGroup(Guid groupId, [FromQuery] Guid wordId)
         {

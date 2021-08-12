@@ -14,6 +14,8 @@ using Application.Services.Core.Abstraction;
 using Microsoft.AspNetCore.SignalR;
 using Application.Hubs;
 using System.Collections.Generic;
+using Domain.Enums;
+using Application.DTOs.Example;
 
 namespace Engrisk.Controllers.V2
 {
@@ -51,14 +53,17 @@ namespace Engrisk.Controllers.V2
             return Ok(word);
         }
         [HttpGet("{id}/questions")]
-        public async Task<IActionResult> GetVocabularyPracticeQuestion(Guid id){
-            if(!await _wordService.CheckExistAsync(id)){
+        public async Task<IActionResult> GetVocabularyPracticeQuestion(Guid id)
+        {
+            if (!await _wordService.CheckExistAsync(id))
+            {
                 return NotFound();
             }
             return Ok(await _wordService.GetVocabularyPracticeQuestionsAsync(id));
         }
         [HttpGet("inserted")]
-        public async Task<IActionResult> GetVocabularyForCreateScript([FromQuery] string search){
+        public async Task<IActionResult> GetVocabularyForCreateScript([FromQuery] string search)
+        {
             return Ok(await _wordService.GetVocabularyForScriptAsync(search));
         }
         /// <summary>
@@ -66,6 +71,7 @@ namespace Engrisk.Controllers.V2
         /// </summary>
         /// <param name="wordDto">Object to create word</param>
         /// <returns>Word has been created</returns>
+        [DisableRequestSizeLimit]
         [HttpPost]
         public async Task<IActionResult> CreateWord([FromForm] WordCreateDTO wordDto)
         {
@@ -104,10 +110,30 @@ namespace Engrisk.Controllers.V2
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateWord(Guid id, [FromForm] WordUpdateDTO wordUpdateDTO)
         {
-            if(!await _wordService.CheckExistAsync(id)){
+            if (!await _wordService.CheckExistAsync(id))
+            {
                 return NotFound();
             }
             return Ok(await _wordService.UpdateAsync(id, wordUpdateDTO));
+        }
+        [HttpPut("{id}/publish/change")]
+        public async Task<IActionResult> ChangeStatus(Guid id, [FromQuery] PublishStatus status)
+        {
+            try
+            {
+                if (!await _wordService.CheckExistAsync(id))
+                {
+                    return NotFound();
+                }
+                await _wordService.PublishAsync(id, status);
+                return Ok();
+            }
+            catch (System.Exception ex)
+            {
+                // TODO
+                return BadRequest(ex);
+            }
+
         }
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteWord(Guid id)
@@ -191,6 +217,18 @@ namespace Engrisk.Controllers.V2
             await _wordService.SelectMemoryAsync(accountId, wordId, memoryId);
             return Ok();
         }
+        [Authorize]
+        [HttpPost("{id}/examples")]
+        public async Task<IActionResult> CreateExample(Guid id, [FromBody] ExampleDTO example){
+            if(!await _wordService.CheckExistAsync(id)){
+                return NotFound();
+            }
+            if(await _wordService.CreateWordExample(id,example)){
+                return Ok();
+            }
+            return NoContent();
+        }
+
         [HttpPost("{wordId}/examples/contribute")]
         public async Task<IActionResult> ContributeExample(Guid wordId, [FromBody] Example example)
         {
@@ -233,7 +271,8 @@ namespace Engrisk.Controllers.V2
         [Authorize]
         [AllowAnonymous]
         [HttpPost("review")]
-        public async Task<IActionResult> VocabularyReview([FromBody] List<Guid> words){
+        public async Task<IActionResult> VocabularyReview([FromBody] List<Guid> words)
+        {
             return Ok(await _wordService.VocabularyReviewAsync(words));
         }
         // [Authorize]
@@ -291,5 +330,14 @@ namespace Engrisk.Controllers.V2
         //         });
         //     }
         // }
+        //Data
+        [HttpGet("data")]
+        public async Task<IActionResult> GenerateData(){
+            return Ok(await _wordService.GenerateWordQuestionAsync());
+        }
+        [HttpGet("remove")]
+        public async Task<IActionResult> RemoveData(){
+             return Ok(await _wordService.DeleteFailQuestionAsync());
+        }
     }
 }

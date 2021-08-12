@@ -13,16 +13,23 @@ namespace Application.DTOs.Exam
         public string Title { get; set; }
         public string Detail { get; set; }
         public string CreatedBy { get; set; }
+        public DateTime CreatedDate { get; set; }
+        public DateTime UpdatedDate { get; set; }
         public virtual AccountBlogDTO Owner { get; set; }
+        public bool ForScript { get; set; }
         public string Difficult { get; set; }
         public int ExpGain { get; set; }
+        public string Purpose { get; set; }
         public int TotalListening { get; set; }
         public int TotalReading { get; set; }
         public int TotalScore { get; set; }
+        public int PassScore { get; set; }
         public int Duration { get; set; }
         public bool IsNew { get; set; }
         public int TimeRemain { get; set; }
         public bool IsPrivate { get; set; }
+        public string PublishStatus { get; set; }
+        public int AccessCount { get; set; }
         public virtual IEnumerable<QuestionDTO> Questions { get; set; }
         public virtual IEnumerable<ExamHistoryDTO> ExamHistories { get; set; }
     }

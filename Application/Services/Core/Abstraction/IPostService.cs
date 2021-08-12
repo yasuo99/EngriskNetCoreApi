@@ -10,10 +10,12 @@ namespace Application.Services.Core.Abstraction
 {
     public interface IPostService : ICensorService
     {
+        Task<bool> CheckExistAsync(Guid id);
         Task<PaginateDTO<PostDTO>> GetAllPosts(PaginationDTO pagination, Status status = Status.Approved, string search = null);
         Task<List<PostDTO>> GetAllPosts(PostTypes type, int acccountId = 0, Status status = Status.Approved);
         Task<PostDTO> GetPostDetailAsync(Guid id);
         Task ReportComment(Comment comment);
         Task<Comment> GetComment(Guid id);
+        Task<bool> LockPostAsync(Guid id);
     }
 }

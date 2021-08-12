@@ -3,17 +3,17 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="3.1.13"/>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="3.1.13"/>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="3.1.17"/>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="3.1.17"/>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="3.1.8"/>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="3.1.8"/>
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="8.1.1"/>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="3.1.13"/>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Proxies" Version="3.1.17"/>
     <PackageReference Include="CloudinaryDotNet" Version="1.13.1"/>
     <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.2.0"/>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="3.1.13"/>
-    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="3.1.13"/>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="3.1.13"/>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="3.1.17"/>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="3.1.17"/>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="3.1.17"/>
     <PackageReference Include="Microsoft.AspNetCore.SignalR" Version="1.1.0"/>
     <PackageReference Include="Google.Apis.Auth" Version="1.51.0"/>
     <PackageReference Include="MegaApiClient" Version="1.8.2"/>
@@ -22,6 +22,9 @@
     <PackageReference Include="Dropbox.Api" Version="5.5.0"/>
     <PackageReference Include="ExcelDataReader" Version="3.6.0"/>
     <PackageReference Include="ExcelDataReader.DataSet" Version="3.6.0"/>
+    <PackageReference Include="System.Data.SqlClient" Version="4.8.2"/>
+    <PackageReference Include="EntityFrameworkCore.Diagrams" Version="0.4.2"/>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.1.5"/>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Application\Application.csproj"/>

@@ -39,10 +39,11 @@ namespace Application.Services.Core
         private readonly IWordService _wordService;
         private readonly IQuizService _quizService;
         private readonly ICertificateService _certificateService;
+        private readonly IRouteService _routeService;
         private AccountExam _accountExam;
         private AccountQuiz _accountQuiz;
         private BoxChat _boxChat;
-        public AccountService(IFileService fileService, IMapper mapper, ApplicationDbContext repo, UserManager<Account> userManager, IExamService examService, INotificationService notificationService, IWordService wordService, IQuizService quizService, ICertificateService certificateService)
+        public AccountService(IFileService fileService, IMapper mapper, ApplicationDbContext repo, UserManager<Account> userManager, IExamService examService, INotificationService notificationService, IWordService wordService, IQuizService quizService, ICertificateService certificateService, IRouteService routeService)
         {
             _fileService = fileService;
             _mapper = mapper;
@@ -53,18 +54,23 @@ namespace Application.Services.Core
             _wordService = wordService;
             _quizService = quizService;
             _certificateService = certificateService;
+            _routeService = routeService;
         }
         /// <summary>
         /// Tạo box chat hỗ trợ trao đổi giữa giảng viên/giáo viên với các thành viên
         /// </summary>
         /// <param name="boxChat">Object có kiểu là BoxChat</param>
         /// <returns>BoxChat</returns>
-        public async Task<BoxChat> CreateBoxChatAsync(BoxchatCreateDTO boxchatCreateDTO)
+        public async Task<BoxChat> CreateBoxChatAsync(int accountId, BoxchatCreateDTO boxchatCreateDTO)
         {
+            var account = await _repo.Accounts.Where(acc => acc.Id == accountId).Include(inc => inc.BoxChats).FirstOrDefaultAsync();
             var boxChat = _mapper.Map<BoxChat>(boxchatCreateDTO);
-            _repo.BoxChats.Add(boxChat);
-            await _repo.SaveChangesAsync();
-            return boxChat;
+            account.BoxChats.Add(boxChat);
+            if (await _repo.SaveChangesAsync() > 0)
+            {
+                return boxChat;
+            }
+            return null;
         }
         private int GetKey()
         {
@@ -188,18 +194,30 @@ namespace Application.Services.Core
         public async Task AcceptBoxChatInvite(int accountId, Guid notificationId, string action)
         {
             var invite = await _repo.BoxChatMembers.FirstOrDefaultAsync(inv => inv.NotificationId == notificationId);
+            var notification = await _repo.AccountNotifications.FirstOrDefaultAsync(acc => acc.AccountId == accountId && acc.NotificationId == notificationId);
             _boxChat ??= await _repo.BoxChats.Where(boxchat => boxchat.Id == invite.BoxChatId).Include(inc => inc.Members).FirstOrDefaultAsync();
             var request = _boxChat.Members.FirstOrDefault(rq => rq.AccountId == accountId);
             switch (action)
             {
                 case "accept":
                     request.Status = Status.Approved;
+                    var host = HubHelper.NotificationClientsConnections.Where(nc => nc.AccountId == _boxChat.AccountId).ToList();
+                    if (host.Count > 0)
+                    {
+                        await _notificationService.SendSignalRResponseToClient("ResponseInvite", _boxChat.AccountId, new { accountId = accountId, boxchatId = _boxChat.Id, status = Enum.GetName(typeof(Status), Status.Approved) });
+                    }
                     break;
                 case "refuse":
                     request.Status = Status.Declined;
+                    var bcHost = HubHelper.NotificationClientsConnections.Where(nc => nc.AccountId == _boxChat.AccountId).ToList();
+                    if (bcHost.Count > 0)
+                    {
+                        await _notificationService.SendSignalRResponseToClient("ResponseInvite", _boxChat.AccountId, new { accountId = accountId, boxchatId = _boxChat.Id, status = Enum.GetName(typeof(Status), Status.Declined) });
+                    }
                     break;
                 default: break;
             }
+            notification.Status = NotificationStatus.Seen;
             await _repo.SaveChangesAsync();
         }
 
@@ -387,7 +405,7 @@ namespace Application.Services.Core
 
         public async Task<List<BoxchatDTO>> GetUserBoxchatAsync(int accountId)
         {
-            var userBoxchats = await _repo.BoxChats.Where(bc => bc.AccountId == accountId || bc.Members.Any(mem => mem.AccountId == accountId && mem.Status == Status.Approved)).Include(inc => inc.Members).AsNoTracking().ToListAsync();
+            var userBoxchats = await _repo.BoxChats.Where(bc => bc.AccountId == accountId || bc.Members.Any(mem => mem.AccountId == accountId && mem.Status == Status.Approved)).Include(inc => inc.Account).Include(inc => inc.Members).OrderByDescending(orderBy => orderBy.CreatedDate).AsNoTracking().ToListAsync();
             var boxchatDTO = _mapper.Map<List<BoxchatDTO>>(userBoxchats);
             return boxchatDTO;
         }
@@ -523,18 +541,96 @@ namespace Application.Services.Core
             return await _certificateService.GetUserCertificatesAsync(pagination, accountId, search);
         }
 
-        public async Task<PaginateDTO<QuestionDTO>> GetUserQuestionAsync(PaginationDTO pagination,QuestionType type, int accountId, string search = null)
+        public async Task<PaginateDTO<QuestionDTO>> GetUserQuestionAsync(PaginationDTO pagination, QuestionType type, int accountId, string search = null)
         {
-           var questions = await _repo.Questions.Where(q => q.AccountId == accountId).Include(inc => inc.Answers).Include(inc => inc.Exams).Include(inc => inc.Scripts).Include(inc => inc.Words).Include(inc => inc.Quizes).ToListAsync();
-            if(search != null){
+            var questions = await _repo.Questions.Where(q => q.AccountId == accountId).Include(inc => inc.Answers).Include(inc => inc.Exams).Include(inc => inc.Scripts).Include(inc => inc.Words).Include(inc => inc.Quizes).ToListAsync();
+            if (search != null)
+            {
                 questions = questions.Where(q => (!string.IsNullOrEmpty(q.PreQuestion) && q.PreQuestion.ToLower().Contains(search.ToLower()) || (!string.IsNullOrEmpty(q.Content) && q.Content.ToLower().Contains(search.ToLower())))).ToList();
             }
-            if(type != QuestionType.None){
+            if (type != QuestionType.None)
+            {
                 questions = questions.Where(question => question.Type == type).ToList();
             }
-           var questionsDto = _mapper.Map<List<QuestionDTO>>(questions);
-           var pagingListQuestionsDto = PagingList<QuestionDTO>.OnCreate(questionsDto, pagination.CurrentPage,pagination.PageSize);
-           return pagingListQuestionsDto.CreatePaginate();
+            var questionsDto = _mapper.Map<List<QuestionDTO>>(questions);
+            var pagingListQuestionsDto = PagingList<QuestionDTO>.OnCreate(questionsDto, pagination.CurrentPage, pagination.PageSize);
+            return pagingListQuestionsDto.CreatePaginate();
+        }
+
+        public async Task<bool> SelectRouteAsync(int accountId, Guid routeId)
+        {
+            return await _routeService.SelectRouteAsync(routeId, accountId);
+        }
+
+        public async Task<bool> DeleteBoxchatAsync(Guid boxchatId)
+        {
+            _boxChat ??= await _repo.BoxChats.Include(inc => inc.Members).FirstOrDefaultAsync(bc => bc.Id == boxchatId);
+            if(_boxChat.Members.Count > 0){
+                await _notificationService.SendSignalRResponseToClients("DeleteBoxChat",_boxChat.Members.Select(sel => sel.AccountId).ToList(), "");
+            }
+            _repo.Remove(_boxChat);
+            if (await _repo.SaveChangesAsync() > 0)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<bool> UpdateBoxchatAsync(Guid boxchatId, BoxchatUpdateDTO boxchatUpdate)
+        {
+            var boxchat = await _repo.BoxChats.FirstOrDefaultAsync(bc => bc.Id == boxchatId);
+            _mapper.Map(boxchatUpdate, boxchat);
+            if (await _repo.SaveChangesAsync() > 0)
+            {
+                return true;
+            }
+            return false;
+        }
+
+        public async Task<bool> MakeUserFinishRouteAsync(int accountId, Guid routeId)
+        {
+            var route = await _repo.Routes.Where(route => route.Id == routeId).Include(inc => inc.Sections).ThenInclude(inc => inc.Scripts).FirstOrDefaultAsync();
+            foreach(var section in route.Sections){
+                var sp = await _repo.SectionProgresses.Where(sp => sp.SectionId == section.Id && sp.AccountId == accountId).FirstOrDefaultAsync();
+                if(sp == null){
+                    sp = new SectionProgress{
+                        SectionId = section.Id,
+                        AccountId = accountId,
+                        IsDone = true
+                    };
+                    _repo.SectionProgresses.Add(sp);
+                    await _repo.SaveChangesAsync();
+                }else{
+                    sp.IsDone = true;
+                }
+                foreach(var script in section.Scripts){
+                    var sdp = await _repo.SectionDetailProgresses.Where(sdp => sdp.SectionProgressId == sp.Id && sdp.ScriptId == script.Id).FirstOrDefaultAsync();
+                    if(sdp == null){
+                        sdp = new SectionDetailProgress{
+                            SectionProgress = sp,
+                            IsDone = true,
+                            Script = script
+                        };
+                        _repo.SectionDetailProgresses.Add(sdp);
+                    }else{
+                        sdp.IsDone = true;
+                    }
+                    if(script.Type == ScriptTypes.Certificate){
+                        var exam = await _repo.Exam.FirstOrDefaultAsync(e => e.ScriptId == script.Id);
+                        var examHistory = new ExamHistory{
+                            AccountId = accountId,
+                            Score = 990,
+                            ReceivedCertificate = false,
+                            ExamId = exam.Id
+                        };
+                        _repo.ExamHistories.Add(examHistory);
+                    }
+                }
+            }
+            if(await _repo.SaveChangesAsync() > 0){
+                return true;
+            }
+            return false;
         }
     }
 }

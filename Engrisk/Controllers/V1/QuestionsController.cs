@@ -231,24 +231,6 @@ namespace Engrisk.Controllers.V1
             return NoContent();
 
         }
-        [HttpPut("{id}")]
-        public async Task<IActionResult> EditQuestion(Guid id, [FromForm] QuestionCreateDTO question)
-        {
-            var questionFromDb = await _repo.GetOneWithConditionTracking<Question>(question => question.Id == id);
-            if (questionFromDb == null)
-            {
-                return NotFound();
-            }
-            _mapper.Map(question, questionFromDb);
-            if (await _repo.SaveAll())
-            {
-                return Ok();
-            }
-            else
-            {
-                return NoContent();
-            }
-        }
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteQuestion(Guid id)
         {

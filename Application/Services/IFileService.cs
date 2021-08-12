@@ -20,5 +20,6 @@ namespace Application.Services
         ///</summary>
         Task<string> GetAudioFromWord(string word, string voice);
         string GetAppBaseUrl(string fileName,string type);
+        string GetImageFileName(string path);
     }
 }

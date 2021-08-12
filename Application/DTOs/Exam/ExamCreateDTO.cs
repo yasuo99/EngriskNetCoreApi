@@ -21,8 +21,6 @@ namespace Application.DTOs.Exam
         public int Pass { get; set; }
         public int UnlockPoint { get; set; }
         public int TotalScore { get; set; }
-        public bool IsPrivate { get; set; }
-        public string PassCode { get; set; }
         public DifficultLevel Difficult { get; set; }
         public ICollection<QuestionCreateDTO> ExamQuestions { get; set; }
         public List<IFormFile> QuestionImages { get; set; }

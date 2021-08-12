@@ -17,6 +17,8 @@ using Application.Services;
 using Infrastructure.Mail;
 using Application.DTOs.Auth;
 using Application.DTOs.Account;
+using Microsoft.AspNetCore.Http;
+using Domain.Enums;
 
 namespace Engrisk.Data
 {
@@ -26,12 +28,14 @@ namespace Engrisk.Data
         private readonly UserManager<Account> _userManager;
         private readonly IConfiguration _config;
         private readonly IMapper _mapper;
-        public AuthRepo(ApplicationDbContext db, UserManager<Account> userManager, IConfiguration config, IMapper mapper)
+        private readonly  IHttpContextAccessor _httpContext;
+        public AuthRepo(ApplicationDbContext db, UserManager<Account> userManager, IConfiguration config, IMapper mapper, IHttpContextAccessor httpContext)
         {
             _userManager = userManager;
             _db = db;
             _config = config;
             _mapper = mapper;
+            _httpContext = httpContext;
         }
 
         public async Task<Account> AccountAccountForBlog(int id)
@@ -155,9 +159,13 @@ namespace Engrisk.Data
             var tokenDescriptor = new SecurityTokenDescriptor()
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.Now.AddHours(8),
                 SigningCredentials = creds
             };
+            if(_httpContext.HttpContext.Request.Headers["device-type"] == Enum.GetName(typeof(DeviceType), DeviceType.Browser)){
+                tokenDescriptor.Expires = DateTime.Now.AddHours(5);
+            }else{
+                tokenDescriptor.Expires = DateTime.Now.AddDays(1);
+            }
             var tokenHandler = new JwtSecurityTokenHandler();
             var secureToken = tokenHandler.CreateToken(tokenDescriptor);
 

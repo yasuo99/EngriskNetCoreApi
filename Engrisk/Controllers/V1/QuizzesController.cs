@@ -31,7 +31,7 @@ namespace Engrisk.Controllers.V1
         [HttpGet]
         public async Task<IActionResult> GetAllQuizzes([FromQuery] SubjectParams subjectParams)
         {
-            var quizzesFromDb = await _repo.GetAll<Quiz>(null, "Section, Questions");
+            var quizzesFromDb = await _repo.GetAll<Quiz>(null, "Questions");
             var quizzes = _mapper.Map<IEnumerable<QuizDetailDTO>>(quizzesFromDb);
             return Ok(quizzes);
         }

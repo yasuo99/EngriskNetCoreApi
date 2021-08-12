@@ -17,7 +17,7 @@ namespace Application.DTOs.Account
         public string Address { get; set; }
         [Phone, MaxLength(10), MinLength(10)]
         public string PhoneNumber { get; set; }
-        public DateTime DateOfBirth { get; set; }
+        public DateTime DateOfBirth { get; set; } = DateTime.MinValue;
         [Required]
         public IEnumerable<string> Roles { get; set; }
     }

@@ -7,5 +7,6 @@ namespace Application.DTOs.Section
         public Guid ScriptId { get; set; }
         public Guid SectionId { get; set; }
         public int AccountId { get; set; }
+        public bool Status { get; set; }
     }
 }

@@ -3,6 +3,8 @@ using System.Threading.Tasks;
 using Application.DTOs.Pagination;
 using Application.DTOs.Word.WordCategory;
 using Application.Services.Core.Abstraction;
+using Application.Utilities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Engrisk.Controllers.V2
@@ -14,11 +16,19 @@ namespace Engrisk.Controllers.V2
         {
             _wordCateService = wordCateService;
         }
-
+        [Authorize]
+        [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] PaginationDTO pagination, [FromQuery] string search, [FromQuery] bool learn, [FromQuery] string tag)
         {
-            return Ok(await _wordCateService.GetAllAsync(pagination: pagination, search, learn, tag));
+            if (User.IsInRole(SD.SUPERADMINROLE) || User.IsInRole(SD.MANAGERROLE))
+            {
+                return Ok(await _wordCateService.GetAllAsync(pagination: pagination, true, search, learn, tag));
+            }
+            else
+            {
+                return Ok(await _wordCateService.GetAllAsync(pagination: pagination, false, search, learn, tag));
+            }
         }
         [HttpGet("all")]
         public async Task<IActionResult> GetAllWithoutPagination()
@@ -78,7 +88,8 @@ namespace Engrisk.Controllers.V2
             var wordCategory = await _wordCateService.CreateCategoryAsync(wordCategoryCreateDTO);
             if (wordCategory != null)
             {
-                return Ok(new{
+                return Ok(new
+                {
                     status = 200,
                     data = wordCategory
                 });
@@ -88,12 +99,15 @@ namespace Engrisk.Controllers.V2
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateWordCategory(Guid id, [FromForm] WordCategoryCreateDTO wordCategoryUpdateDTO)
         {
-            if(!await _wordCateService.ExistAsync(id)){
+            if (!await _wordCateService.ExistAsync(id))
+            {
                 return NotFound();
             }
             var updatedWordCategory = await _wordCateService.UpdateCategoryAsync(id, wordCategoryUpdateDTO);
-            if(updatedWordCategory != null){
-                return Ok(new{
+            if (updatedWordCategory != null)
+            {
+                return Ok(new
+                {
                     status = 200,
                     data = updatedWordCategory
                 });
@@ -103,7 +117,8 @@ namespace Engrisk.Controllers.V2
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteWordCategory(Guid id)
         {
-            if(!await _wordCateService.ExistAsync(id)){
+            if (!await _wordCateService.ExistAsync(id))
+            {
                 return NotFound();
             }
             await _wordCateService.DeleteCategoryAsync(id);

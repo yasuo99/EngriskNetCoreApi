@@ -78,12 +78,30 @@ namespace Application.Services.Core
             var dashboard = new DashboardDTO();
             var accounts = await _context.Accounts.AsNoTracking().Where(acc => acc.IsDisabled == false).ToListAsync();
             dashboard.TotalAccount = accounts.Count;
-            dashboard.JoinProgress = accounts.GroupBy(groupBy => groupBy.JoinedDate).Select(sel => new SeriesChartDTO{Date = sel.Key,Value = sel.Count()}).ToList();
-            dashboard.TotalExam = await _context.Exam.AsNoTracking().Where(quiz => quiz.VerifiedStatus == Status.Approved).CountAsync();
-            dashboard.TotalQuiz = await _context.Quiz.AsNoTracking().Where(quiz => quiz.VerifiedStatus == Status.Approved).CountAsync();
-            dashboard.TotalRoute = await _context.Routes.Where(route => route.VerifiedStatus == Status.Approved).AsNoTracking().CountAsync();
+            dashboard.JoinProgress = accounts.GroupBy(groupBy => groupBy.JoinedDate).Select(sel => new SeriesChartDTO { Date = sel.Key, Value = sel.Count() }).ToList();
+            dashboard.TotalExam = await _context.Exam.AsNoTracking().Where(quiz => quiz.VerifiedStatus == Status.Nope).CountAsync();
+            dashboard.TotalQuiz = await _context.Quiz.AsNoTracking().Where(quiz => quiz.VerifiedStatus == Status.Nope).CountAsync();
+            dashboard.TotalRoute = await _context.Routes.Where(route => route.VerifiedStatus == Status.Nope).AsNoTracking().CountAsync();
             dashboard.Online = HubHelper.NotificationClientsConnections.Select(sel => sel.Username).ToList();
             return dashboard;
+        }
+
+        public async Task<List<RouteOverviewDTO>> GetRouteOverviewAsync()
+        {
+            List<RouteOverviewDTO> routeOverviewDTOs = new List<RouteOverviewDTO>();
+            // var routes = await _context.Routes.Include(inc => inc.Sections).AsNoTracking().ToListAsync();
+            // foreach (var route in routes)
+            // {
+            //     var totalParticipate = await _context.SectionProgresses.Where(sp => sp.Section.RouteId == route.Id).GroupBy(groupBy => groupBy.Section.RouteId).ToDictionaryAsync(dic => dic.Key, value => value.Count());
+            //     // var doneRoute = await _context.SectionProgresses.Where(sp => sp.Section.RouteId == route.Id && sp.IsDone)
+            //     var routeOverview = new RouteOverviewDTO
+            //     {
+            //         Route = route,
+            //         TotalParticipate = totalParticipate.Count,
+
+            //     };
+            // }
+            return routeOverviewDTOs;
         }
 
         public async Task<dynamic> GetWaitingCensorContentAsync(PaginationDTO pagination, CensorTypes type)

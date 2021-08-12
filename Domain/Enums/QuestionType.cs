@@ -6,13 +6,15 @@ namespace Domain.Enums
         Toeic,
         Listening,
         Conversation,
-        FillOut,
+        Fillout,
         Arrange,
         Connection,
         Practice,
         Writing,
         Basic,
         Select,
-        Reading
+        Reading,
+        Quiz,
+        Speaking
     }
 }

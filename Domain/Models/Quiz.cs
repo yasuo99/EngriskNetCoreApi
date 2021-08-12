@@ -15,6 +15,7 @@ namespace Domain.Models
             Accounts = new HashSet<AccountQuiz>();
             Shared = new HashSet<AccountShare>();
             VerifiedStatus = Status.Nope;
+            PublishStatus = PublishStatus.UnPublished;
         }
         public string QuizPhoto { get; set; }
         public string QuizName { get; set; }
@@ -23,6 +24,7 @@ namespace Domain.Models
         public bool RequireLogin { get; set; } = false;
         public bool IsPrivate { get; set; } = false;
         public Status VerifiedStatus { get; set; }
+        public PublishStatus PublishStatus { get; set; }
         public int AccessCount { get; set; }
         public virtual ICollection<QuizQuestion> Questions { get; set; }
         public virtual ICollection<AccountQuiz> Accounts { get; set; }

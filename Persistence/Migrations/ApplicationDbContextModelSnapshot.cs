@@ -15,7 +15,7 @@ namespace Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "3.1.13")
+                .HasAnnotation("ProductVersion", "3.1.17")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128)
                 .HasAnnotation("SqlServer:ValueGenerationStrategy", SqlServerValueGenerationStrategy.IdentityColumn);
 
@@ -482,11 +482,30 @@ namespace Persistence.Migrations
                     b.Property<int>("Duration")
                         .HasColumnType("int");
 
+                    b.Property<string>("EndPage")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsPrivate")
                         .HasColumnType("bit");
 
+                    b.Property<int>("PassScore")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PublishStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<Guid?>("ScriptId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("StartPage")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Title")
                         .HasColumnType("nvarchar(max)");
@@ -528,9 +547,6 @@ namespace Persistence.Migrations
                     b.Property<int>("AccountId")
                         .HasColumnType("int");
 
-                    b.Property<int>("CurrentQuestion")
-                        .HasColumnType("int");
-
                     b.Property<Guid>("ExamId")
                         .HasColumnType("uniqueidentifier");
 
@@ -540,13 +556,19 @@ namespace Persistence.Migrations
                     b.Property<bool>("IsDone")
                         .HasColumnType("bit");
 
+                    b.Property<int>("Listening")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Reading")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("ReceivedCertificate")
+                        .HasColumnType("bit");
+
                     b.Property<int>("Score")
                         .HasColumnType("int");
 
                     b.Property<DateTime>("Timestamp_end")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("Timestamp_pause")
                         .HasColumnType("datetime2");
 
                     b.Property<DateTime>("Timestamp_start")
@@ -701,9 +723,6 @@ namespace Persistence.Migrations
 
                     b.Property<bool>("IsDone")
                         .HasColumnType("bit");
-
-                    b.Property<int>("PauseQuestion")
-                        .HasColumnType("int");
 
                     b.Property<Guid>("QuizId")
                         .HasColumnType("uniqueidentifier");
@@ -950,6 +969,10 @@ namespace Persistence.Migrations
                     b.Property<int?>("Score")
                         .HasColumnType("int");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Toeic")
                         .HasColumnType("nvarchar(max)");
 
@@ -994,6 +1017,10 @@ namespace Persistence.Migrations
 
                     b.Property<bool>("IsPrivate")
                         .HasColumnType("bit");
+
+                    b.Property<string>("PublishStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("QuizName")
                         .HasColumnType("nvarchar(max)");
@@ -1132,6 +1159,10 @@ namespace Persistence.Migrations
                     b.Property<string>("PhotoUrl")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("PublishStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("RequireLogin")
                         .HasColumnType("bit");
 
@@ -1207,6 +1238,35 @@ namespace Persistence.Migrations
                     b.ToTable("TopupHistories");
                 });
 
+            modelBuilder.Entity("Domain.Models.Version2.AccountAnswer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AnswerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ExamHistoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("QuestionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("Result")
+                        .HasColumnType("bit");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AnswerId");
+
+                    b.HasIndex("ExamHistoryId");
+
+                    b.HasIndex("QuestionId");
+
+                    b.ToTable("AccountAnswers");
+                });
+
             modelBuilder.Entity("Domain.Models.Version2.AccountCardmem", b =>
                 {
                     b.Property<int>("AccountId")
@@ -1229,14 +1289,18 @@ namespace Persistence.Migrations
 
             modelBuilder.Entity("Domain.Models.Version2.AccountCertificate", b =>
                 {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int>("AccountId")
                         .HasColumnType("int");
 
-                    b.Property<Guid>("CertificateId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<DateTime>("AchievedDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CertificateId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("ExpireDate")
                         .HasColumnType("datetime2");
@@ -1244,7 +1308,9 @@ namespace Persistence.Migrations
                     b.Property<string>("Signature")
                         .HasColumnType("nvarchar(max)");
 
-                    b.HasKey("AccountId", "CertificateId");
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
 
                     b.HasIndex("CertificateId");
 
@@ -1491,7 +1557,7 @@ namespace Persistence.Migrations
                     b.Property<int>("LifeTime")
                         .HasColumnType("int");
 
-                    b.Property<Guid?>("RouteId")
+                    b.Property<Guid?>("ScriptId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Subject")
@@ -1511,9 +1577,9 @@ namespace Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("RouteId")
+                    b.HasIndex("ScriptId")
                         .IsUnique()
-                        .HasFilter("[RouteId] IS NOT NULL");
+                        .HasFilter("[ScriptId] IS NOT NULL");
 
                     b.ToTable("Certificates");
                 });
@@ -1854,6 +1920,10 @@ namespace Persistence.Migrations
                     b.Property<bool>("IsSequentially")
                         .HasColumnType("bit");
 
+                    b.Property<string>("PublishStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("RouteImage")
                         .HasColumnType("nvarchar(max)");
 
@@ -2181,7 +2251,15 @@ namespace Persistence.Migrations
                     b.Property<Guid?>("FamilyId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("PublishStatus")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Spelling")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid?>("SynonymId")
@@ -2704,7 +2782,8 @@ namespace Persistence.Migrations
                 {
                     b.HasOne("Domain.Models.Version2.Route", "Route")
                         .WithMany("Sections")
-                        .HasForeignKey("RouteId");
+                        .HasForeignKey("RouteId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Domain.Models.TopupHistory", b =>
@@ -2713,6 +2792,26 @@ namespace Persistence.Migrations
                         .WithMany("TopupHistories")
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.Models.Version2.AccountAnswer", b =>
+                {
+                    b.HasOne("Domain.Models.Version2.Answer", "Answer")
+                        .WithMany("AccountAnswers")
+                        .HasForeignKey("AnswerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.ExamHistory", "ExamHistory")
+                        .WithMany("AccountAnswers")
+                        .HasForeignKey("ExamHistoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.Question", "Question")
+                        .WithMany("AccountAnswers")
+                        .HasForeignKey("QuestionId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
@@ -2862,9 +2961,9 @@ namespace Persistence.Migrations
 
             modelBuilder.Entity("Domain.Models.Version2.Certificate", b =>
                 {
-                    b.HasOne("Domain.Models.Version2.Route", "Route")
+                    b.HasOne("Domain.Models.Version2.Script", "Script")
                         .WithOne("Certificate")
-                        .HasForeignKey("Domain.Models.Version2.Certificate", "RouteId");
+                        .HasForeignKey("Domain.Models.Version2.Certificate", "ScriptId");
                 });
 
             modelBuilder.Entity("Domain.Models.Version2.DayStudy", b =>
@@ -3005,7 +3104,7 @@ namespace Persistence.Migrations
                     b.HasOne("Domain.Models.Word", "Word")
                         .WithMany("Scripts")
                         .HasForeignKey("WordId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -3101,13 +3200,13 @@ namespace Persistence.Migrations
                     b.HasOne("Domain.Models.Question", "Question")
                         .WithMany("Words")
                         .HasForeignKey("QuestionId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("Domain.Models.Word", "Word")
                         .WithMany("Questions")
                         .HasForeignKey("WordId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

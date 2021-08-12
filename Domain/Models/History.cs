@@ -14,7 +14,6 @@ namespace Domain.Models
         [ForeignKey("QuizId")]
         public virtual Quiz Quiz { get; set; }
         public DateTime StartTimestamp { get; set; }
-        public int PauseQuestion { get; set; }
         public DateTime EndTimestamp{get;set;}
         public bool IsDone { get; set; }
         public int TimeSpent { get; set; }

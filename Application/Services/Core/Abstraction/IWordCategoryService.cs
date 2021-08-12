@@ -10,7 +10,7 @@ namespace Application.Services.Core.Abstraction
     public interface IWordCategoryService
     {
         Task<bool> ExistAsync(Guid id);
-        Task<PaginateDTO<WordCategory>> GetAllAsync(PaginationDTO pagination, string search = null, bool learn = false, string tag = "all");
+        Task<PaginateDTO<WordCategory>> GetAllAsync(PaginationDTO pagination, bool manage, string search = null, bool learn = false, string tag = "all");
         Task<List<WordCategoryDTO>> GetAllAsync();
         Task<WordCategoryDTO> GetDetailAsync(Guid id);
         Task<WordCategoryDTO> UserGetDetailAsync(int accountId, Guid categoryId);

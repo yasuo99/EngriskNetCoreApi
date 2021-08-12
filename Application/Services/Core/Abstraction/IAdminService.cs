@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Application.DTOs.Account.Route;
 using Application.DTOs.Admin;
@@ -18,6 +19,6 @@ namespace Application.Services.Core.Abstraction
         Task<DashboardDTO> GetDashboardAsync();
         //Put
         Task<bool> CensoredContentAsync(Guid id, CensorTypes type, Status status, DifficultLevel difficultLevel = DifficultLevel.Easy);
-
+        Task<List<RouteOverviewDTO>> GetRouteOverviewAsync();
     }
 }

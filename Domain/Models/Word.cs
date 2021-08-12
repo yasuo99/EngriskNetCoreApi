@@ -21,6 +21,8 @@ namespace Domain.Models
             Families = new HashSet<Word>();
             Categories = new HashSet<Category>();
             Type = VocabularyType.Insert;
+            PublishStatus = PublishStatus.UnPublished;
+            Status = VocabularyStatus.Free;
         }
         public Guid? FamilyId { get; set; }
         public virtual Word Family { get; set; }
@@ -32,7 +34,9 @@ namespace Domain.Models
         public string WordVoice { get; set; }
         public string Vie { get; set; }
         public WordClasses Class { get; set; }
+        public VocabularyStatus Status { get; set; }
         public VocabularyType Type { get; set; }
+        public PublishStatus PublishStatus { get; set; }
         public virtual ICollection<WordGroup> Groups { get; set; }
         public virtual ICollection<WordLearnt> Learned { get; set; }
         public virtual ICollection<Memory> Memories { get; set; }

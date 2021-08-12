@@ -71,11 +71,18 @@ namespace Application.Services.Core
 
         public async Task<PaginateDTO<AccountNotificationDTO>> GetUserNotificationsAsync(int userId, PaginationDTO pagination)
         {
-            var notifications = await _context.AccountNotifications.Where(an => an.AccountId == userId).Include(an => an.Notification).OrderByDescending(orderBy => orderBy.Notification.CreatedDate).AsNoTracking().ToListAsync();
-            var returnNotifications = _mapper.Map<List<AccountNotificationDTO>>(notifications);
-
-            var paginateNotifications = PagingList<AccountNotificationDTO>.OnCreate(returnNotifications, pagination.CurrentPage, pagination.PageSize);
-            return paginateNotifications.CreatePaginate();
+            var notifications = from notify in _context.AccountNotifications.Where(ac => ac.AccountId == userId).Include(inc => inc.Notification).AsNoTracking() select notify;
+            var paginateNotifications = await PagingList<AccountNotification>.OnCreateAsync(notifications, pagination.CurrentPage, pagination.PageSize);
+            var result = paginateNotifications.CreatePaginate();
+            var returnNotifications = _mapper.Map<List<AccountNotificationDTO>>(result.Items);
+            return new PaginateDTO<AccountNotificationDTO>
+            {
+                CurrentPage = pagination.CurrentPage,
+                PageSize = pagination.PageSize,
+                Items = returnNotifications,
+                TotalItems = result.TotalItems,
+                TotalPages = result.TotalPages
+            };
         }
 
         public async Task SeenNotification(int userId, Guid notificationId)
@@ -122,10 +129,14 @@ namespace Application.Services.Core
         public async Task SendSignalRResponseToClient(string method, int accountId, object arg)
         {
             var responseObject = Extension.CamelCaseSerialize(arg);
-            var receiver = HubHelper.NotificationClientsConnections.FirstOrDefault(nc => nc.AccountId == accountId);
-            if (receiver != null)
+            var receiver = HubHelper.NotificationClientsConnections.Where(nc => nc.AccountId == accountId).ToList();
+            if (receiver.Count > 0)
             {
-                await _hub.Clients.Client(receiver.ClientId).SendAsync(method, responseObject);
+                foreach (var client in receiver)
+                {
+                    await _hub.Clients.Client(client.ClientId).SendAsync(method, responseObject);
+                }
+
             }
         }
 
@@ -134,10 +145,14 @@ namespace Application.Services.Core
             var responseObject = Extension.CamelCaseSerialize(arg);
             foreach (var id in accounts)
             {
-                var receiver = HubHelper.NotificationClientsConnections.FirstOrDefault(nc => nc.AccountId == id);
-                if (receiver != null)
+                var receiver = HubHelper.NotificationClientsConnections.Where(nc => nc.AccountId == id).ToList();
+                if (receiver.Count > 0)
                 {
-                    await _hub.Clients.Client(receiver.ClientId).SendAsync(method, responseObject);
+                    foreach (var client in receiver)
+                    {
+                        await _hub.Clients.Client(client.ClientId).SendAsync(method, responseObject);
+                    }
+
                 }
             }
         }

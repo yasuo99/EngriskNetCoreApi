@@ -1,16 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Application.DTOs.Example;
 using Application.DTOs.Memory;
 using Application.DTOs.Pagination;
 using Application.DTOs.Question;
 using Application.DTOs.Word;
+using Domain.Enums;
 using Domain.Models;
 using Domain.Models.Version2;
 
 namespace Application.Services.Core.Abstraction
 {
-    public interface IWordService
+    public interface IWordService: IPublishService
     {
         Task<PaginateDTO<WordDTO>> GetAllAsync(PaginationDTO pagination, string search = null);
         Task<List<WordDTO>> GetAllAsync();
@@ -24,6 +26,8 @@ namespace Application.Services.Core.Abstraction
         Task<bool> CheckExistAsync(Guid id);
         Task<bool> CheckConflictAsync(WordCreateDTO wordCreateDTO);
         Task<WordDTO> CreateWordAsync(WordCreateDTO wordCreateDTO);
+        Task<bool> CreateWordExample(Guid id, ExampleDTO example);
+        Task<bool> DeleteWordExamole(Guid id, List<Guid> examples);
         Task<Memory> CreateWordMemoryAsync(Word word, MemoryCreateDTO memoryCreateDTO, int accountId);
         Task<Memory> GetMemoryAsync(Word word, Guid memoryId);
         Task SelectMemoryAsync(int accountId, Guid wordId, Guid memoryId);
@@ -41,8 +45,12 @@ namespace Application.Services.Core.Abstraction
         Task<List<WordDTO>> GetVocabularyForScriptAsync(string search = null);
 
         //Ôn tập từ vựng
+        Task<PaginateDTO<QuestionDTO>> GetWordPracticeQuestionAsync(Guid wordId, PaginationDTO pagination, QuestionType type = QuestionType.None, string search = null);
         Task<List<QuestionDTO>> WordLearnedReviewAsync(int accountId, string option);
         Task<List<QuestionDTO>> VocabularyReviewAsync(List<Guid> words);
         Task<bool> CheckReviewQuestionAsync(Guid questionId, Guid answerId);
+        //Data
+        Task<bool> GenerateWordQuestionAsync();
+        Task<bool> DeleteFailQuestionAsync();
     }
 }

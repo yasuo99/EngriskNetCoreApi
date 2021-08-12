@@ -54,19 +54,18 @@ namespace Application.Helper
             .ForMember(gift => gift.Type, options => options.MapFrom(src => src.Attendance.Type))
             .ForMember(gift => gift.Value, options => options.MapFrom(src => src.Attendance.Value));
             CreateMap<Question, QuestionDTO>()
-            .ForMember(mem => mem.Audio,opts => opts.MapFrom(src => src.AudioFileName))
+            .ForMember(mem => mem.Audio, opts => opts.MapFrom(src => src.AudioFileName))
             .ForMember(mem => mem.PhotoUrl, opts => opts.MapFrom(src => src.ImageFileName));
             CreateMap<Question, QuestionDetailDTO>();
             CreateMap<QuestionDTO, Question>().ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
             CreateMap<QuestionCreateDTO, Question>().ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
-            CreateMap<QuestionCreateDTO, Question>().ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
             CreateMap<Exam, ExamDTO>()
             .ForMember(exam => exam.IsNew, opts => opts.MapFrom(src => DateTime.Now.Subtract(src.CreatedDate).Days < 3 ? true : false))
             .ForMember(exam => exam.Questions, opts => opts.MapFrom(src => src.Questions.Select(sl => sl.Question)));
-            CreateMap<ExamDTO,Exam>();
+            CreateMap<ExamDTO, Exam>();
             CreateMap<ExamCreateDTO, Exam>().ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
             CreateMap<Quiz, QuizDTO>();
-            CreateMap<QuizDTO,Quiz>();
+            CreateMap<QuizDTO, Quiz>();
             CreateMap<QuizQuestion, QuestionDTO>()
             .ForMember(question => question.Id, options => options.MapFrom(src => src.Question.Id))
             .ForMember(question => question.Audio, opts => opts.MapFrom(src => src.Question.AudioFileName))
@@ -76,7 +75,7 @@ namespace Application.Helper
             .ForMember(question => question.PhotoUrl, opts => opts.MapFrom(src => src.Question.ImageFileName))
             .ForMember(question => question.Answers, opts => opts.MapFrom(src => src.Question.Answers));
             CreateMap<QuestionDTO, QuizQuestion>()
-            .ForMember(mem => mem.QuestionId,opts => opts.MapFrom(src => src.Id));
+            .ForMember(mem => mem.QuestionId, opts => opts.MapFrom(src => src.Id));
             CreateMap<Post, PostDTO>()
             .ForMember(post => post.TotalComment, opts => opts.MapFrom(src => src.Comments.Count()));
             CreateMap<Account, AdminAccountDTO>()
@@ -98,7 +97,8 @@ namespace Application.Helper
             .ForMember(w => w.WordVoice, opts => opts.MapFrom(src => src.Word.WordVoice));
             CreateMap<Word, WordDTO>();
             CreateMap<Word, WordDetailDTO>();
-            CreateMap<Example,ExampleDTO>();
+            CreateMap<Example, ExampleDTO>();
+            CreateMap<ExampleDTO, Example>();
             // CreateMap<WordExample, ExampleDTO>()
             // .ForMember(example => example.Eng, opts => opts.MapFrom(src => src.Example.Eng))
             // .ForMember(example => example.Vie, opts => opts.MapFrom(src => src.Example.Vie))
@@ -116,11 +116,10 @@ namespace Application.Helper
             .ForMember(question => question.PhotoUrl, opts => opts.MapFrom(src => src.Question.ImageFileName))
             .ForMember(question => question.Toeic, opts => opts.MapFrom(src => src.Question.Toeic))
             .ForMember(question => question.Answers, opts => opts.MapFrom(src => src.Question.Answers));
-            CreateMap<QuestionDTO,ExamQuestion>()
+            CreateMap<QuestionDTO, ExamQuestion>()
             .ForMember(mem => mem.QuestionId, opts => opts.MapFrom(src => src.Id));
             CreateMap<ExamHistory, ExamHistoryDTO>()
             .ForMember(h => h.ExamTitle, opts => opts.MapFrom(src => src.Exam.Title))
-            .ForMember(h => h.IsPause, opts => opts.MapFrom(src => src.Timestamp_pause != null && src.IsDone == false))
             .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
             CreateMap<Exam, ExamAnswerDTO>();
             CreateMap<ExamQuestion, QuestionAnswerDTO>()
@@ -192,7 +191,10 @@ namespace Application.Helper
             .ForMember(mem => mem.QuizTitle, opts => opts.MapFrom(sourceMember => sourceMember.Quiz.QuizName))
             .ForMember(mem => mem.ExamTitle, opts => opts.MapFrom(src => src.Exam.Title));
             CreateMap<AccountShare, QuizSharingDTO>();
-            CreateMap<BoxChat, BoxchatDTO>();
+            CreateMap<BoxChat, BoxchatDTO>()
+            .ForMember(mem => mem.PhotoUrl, opts => opts.MapFrom(src => src.Account.PhotoUrl));
+            CreateMap<BoxchatUpdateDTO, BoxChat>()
+            .ForAllMembers(mems => mems.Condition((src, dest, mem) => mem != null));
             CreateMap<Message, ReceiveMessageDTO>();
             CreateMap<BoxChatMember, AccountBlogDTO>()
             .ForMember(mem => mem.Id, opts => opts.MapFrom(src => src.AccountId))
@@ -272,23 +274,39 @@ namespace Application.Helper
             .ForMember(w => w.Examples, opts => opts.MapFrom(src => src.Word.Examples));
             CreateMap<Section, SectionScriptDTO>();
             CreateMap<SectionDetailProgress, ScriptLearnHistoryDTO>()
-            .ForMember(mem => mem.Type, opts => opts.MapFrom(src => src.Script.Type));
-            CreateMap<WordCategoryDTO,Category>()
+            .ForMember(mem => mem.Type, opts => opts.MapFrom(src => src.Script.Type))
+            .ForMember(mem => mem.ExamId, opts => opts.MapFrom(src => src.Script.MiniExam.Id));
+            CreateMap<WordCategoryDTO, Category>()
             .ForMember(mem => mem.WordCategoryId, opts => opts.MapFrom(src => src.Id));
-            CreateMap<QuestionDTO,WordQuestion>()
+            CreateMap<QuestionDTO, WordQuestion>()
             .ForMember(mem => mem.QuestionId, opts => opts.MapFrom(src => src.Id));
-            CreateMap<QuestionDTO,ScriptQuestion>()
+            CreateMap<QuestionDTO, ScriptQuestion>()
             .ForMember(mem => mem.QuestionId, opts => opts.MapFrom(src => src.Id));
-            CreateMap<WordDTO,ScriptWord>()
-            .ForMember(mem => mem.WordId,opts => opts.MapFrom(src => src.Id));
-            CreateMap<ScriptCreateDTO,Script>();
-            CreateMap<ExamScriptDTO,Exam>();
-            CreateMap<Certificate,CertificateDTO>();
-            CreateMap<CategoryTag,WordCategoryTag>()
+            CreateMap<WordDTO, ScriptWord>()
+            .ForMember(mem => mem.WordId, opts => opts.MapFrom(src => src.Id));
+            CreateMap<ScriptCreateDTO, Script>();
+            CreateMap<ExamScriptDTO, Exam>();
+            CreateMap<Certificate, CertificateDTO>();
+            CreateMap<CertificateCreateDTO, Certificate>()
+            .ForAllMembers(mems => mems.Condition((src, dest, mem) => mem != null));
+            CreateMap<CategoryTag, WordCategoryTag>()
             .ForMember(mem => mem.CategoryTagId, opts => opts.MapFrom(src => src.Id));
-            CreateMap<WordCategoryTag,CategoryTag>()
+            CreateMap<WordCategoryTag, CategoryTag>()
             .ForMember(mem => mem.Id, opts => opts.MapFrom(src => src.CategoryTagId))
             .ForMember(mem => mem.Tag, opts => opts.MapFrom(src => src.CategoryTag.Tag));
+            CreateMap<Answer, AnswerAnalyzeDTO>();
+            CreateMap<ExamQuestion, QuestionAnalyzeDTO>()
+            .ForMember(mem => mem.Id, opts => opts.MapFrom(src => src.Question.Id))
+            .ForMember(mem => mem.PreQuestion, opts => opts.MapFrom(src => src.Question.PreQuestion))
+            .ForMember(mem => mem.Content, opts => opts.MapFrom(src => src.Question.Content))
+            .ForMember(mem => mem.Audio, opts => opts.MapFrom(src => src.Question.AudioFileName))
+            .ForMember(mem => mem.PhotoUrl, opts => opts.MapFrom(src => src.Question.ImageFileName))
+            .ForMember(mem => mem.Answers, opts => opts.MapFrom(src => src.Question.Answers));
+            CreateMap<Exam, ExamAnalyzeDTO>();
+            CreateMap<WordQuestion, QuestionDTO>();
+            CreateMap<Script,ScriptAnalyzeDTO>();
+            CreateMap<Section,SectionAnalyzeDTO>();
+            CreateMap<Route,RouteAnalyzeDTO>();
         }
     }
 }

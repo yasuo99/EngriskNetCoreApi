@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Application.DTOs.Section;
+using Domain.Enums;
 
 namespace Application.DTOs.Account.Route
 {
@@ -13,6 +14,8 @@ namespace Application.DTOs.Account.Route
         public bool IsPrivate { get; set; }
         public int Done { get; set; }
         public DateTime CreatedDate { get; set; }
+        public DateTime UpdatedDate { get; set; }
+        public string PublishStatus { get; set; }
         public List<SectionDTO> Sections { get; set; }
     }
 }

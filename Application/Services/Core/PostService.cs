@@ -37,15 +37,30 @@ namespace Application.Services.Core
             return false;
         }
 
+        public async Task<bool> CheckExistAsync(Guid id)
+        {
+            return await _context.Posts.AnyAsync(p => p.Id == id);
+        }
+
         public async Task<PaginateDTO<PostDTO>> GetAllPosts(PaginationDTO pagination, Status status = Status.Approved, string search = null)
         {
-            var posts = await _context.Posts.Where(post => post.VerifiedStatus == status).Include(inc => inc.Account).Include(inc => inc.PostImages).Include(inc => inc.Comments).ToListAsync();
-            if(search != null){
-                posts = posts.Where(p => p.Title.ToLower().Contains(search.Trim().ToLower())  || p.Content.ToLower().Contains(search.Trim().ToLower())).ToList();
+            var posts = from p in _context.Posts.OrderByDescending(orderBy => orderBy.UpdatedDate).OrderByDescending(orderBy => orderBy.CreatedDate) select p;
+            posts = posts.Where(p => p.VerifiedStatus == status);
+            if (search != null)
+            {
+                posts = posts.Where(p => p.Title.ToLower().Contains(search.Trim().ToLower()) || p.Content.ToLower().Contains(search.Trim().ToLower()));
             }
-            var postsDto = _mapper.Map<List<PostDTO>>(posts);
-            var pagingListPosts = PagingList<PostDTO>.OnCreate(postsDto, pagination.CurrentPage, pagination.PageSize);
-            return pagingListPosts.CreatePaginate();
+
+            var pagingListPosts = await PagingList<Post>.OnCreateAsync(posts, pagination.CurrentPage, pagination.PageSize);
+            var result = pagingListPosts.CreatePaginate();
+            var postsDto = _mapper.Map<List<PostDTO>>(result.Items);
+            return new PaginateDTO<PostDTO>{
+                CurrentPage = pagination.CurrentPage,
+                PageSize = pagination.PageSize,
+                TotalPages = result.TotalPages,
+                TotalItems = result.TotalItems,
+                Items = postsDto
+            };
         }
 
         public async Task<List<PostDTO>> GetAllPosts(PostTypes type, int acccountId = 0, Status status = Status.Approved)
@@ -76,6 +91,17 @@ namespace Application.Services.Core
         public async Task<PostDTO> GetPostDetailAsync(Guid id)
         {
             throw new NotImplementedException();
+        }
+
+        public async Task<bool> LockPostAsync(Guid id)
+        {
+            var post = await _context.Posts.FirstOrDefaultAsync(p => p.Id == id);
+            post.IsLocked = !post.IsLocked;
+            if (await _context.SaveChangesAsync() > 0)
+            {
+                return true;
+            }
+            return false;
         }
 
         public async Task ReportComment(Comment comment)

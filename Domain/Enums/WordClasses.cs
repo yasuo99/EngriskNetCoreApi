@@ -12,6 +12,8 @@ namespace Domain.Enums
         Conjunction,
         Interjection,
         Transitive,
-        Intransitive
+        Intransitive,
+        PhrasalVerb,
+        PhrasalNoun
     }
 }

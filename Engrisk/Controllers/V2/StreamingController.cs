@@ -32,7 +32,8 @@ namespace Engrisk.Controllers.V2
             var filePath = Path.Combine(_fileService.ContentRootPath, image);
             if (System.IO.File.Exists(filePath))
             {
-                return PhysicalFile(filePath, "image/*");
+                var tempImage = System.IO.File.ReadAllBytes(filePath);
+                return File(tempImage, "image/*", _fileService.GetImageFileName(image));
             }
             return NotFound();
 

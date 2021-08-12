@@ -13,6 +13,7 @@ namespace Domain.Models
         public Question()
         {
             Answers = new HashSet<Answer>();
+            Status = QuestionStatus.Free;
         }
         public string AudioFileName { get; set; }
         public string ImageFileName { get; set; }
@@ -26,6 +27,7 @@ namespace Domain.Models
         public virtual Account Account { get; set; }
         public virtual ICollection<Answer> Answers { get; set; }
         public int? Score { get; set; }
+        public QuestionStatus Status { get; set; }
         public bool IsMultitpleRightAnswer { get; set; } = false;
         public string Explaination { get; set; }
         public QuestionType Type { get; set; }
@@ -37,5 +39,7 @@ namespace Domain.Models
         public virtual ICollection<WordQuestion> Words { get; set; }
         [JsonIgnore]
         public virtual ICollection<ScriptQuestion> Scripts { get; set; }
+        [JsonIgnore]
+        public virtual ICollection<AccountAnswer> AccountAnswers { get; set; }
     }
 }

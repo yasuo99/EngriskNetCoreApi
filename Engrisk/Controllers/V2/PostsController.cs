@@ -41,6 +41,25 @@ namespace Engrisk.Controllers.V2
         {
             return Ok(await _postService.CensorContentAsync(id, status));
         }
+        [Authorize]
+        [HttpPut("{id}/lock")]
+        public async Task<IActionResult> LockPost(Guid id){
+            try
+            {
+                if(!await _postService.CheckExistAsync(id)){
+                    return NotFound();
+                }
+                if(await _postService.LockPostAsync(id)){
+                    return Ok();
+                }
+                return NoContent();
+            }   
+            catch (System.Exception ex)
+            {
+                return BadRequest(ex);
+                 // TODO
+            }
+        }
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
